@@ -60,24 +60,3 @@ class User(UserBase, table=True):
 
 	
 
-# --- CREATE (Для регистрации) ---
-# Фронт шлет это. Мы требуем сырой пароль.
-class UserCreate(UserBase):
-	password: str = Field(min_length=8)
-
-
-# --- READ (Для ответа API) ---
-# Мы отдаем это. Скрываем пароль, показываем ID и дату регистрации.
-class UserRead(UserBase):
-	id: uuid.UUID
-	is_verified: bool
-	role: UserRole
-	created_at: datetime
-
-
-# --- UPDATE (Для редактирования профиля) ---
-# Все поля опциональны (можно сменить только имя, не меняя язык).
-class UserUpdate(SQLModel):
-	full_name: Optional[str] = None
-	email: Optional[str] = None
-	language_pref: Optional[UserLanguage] = None

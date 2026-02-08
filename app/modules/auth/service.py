@@ -1,8 +1,9 @@
 # app/modules/auth/service.py
 from sqlmodel import Session, select
 from fastapi import HTTPException, status
-from app.modules.auth.models import User, UserCreate
+from app.modules.auth.models import User
 from app.core.security import get_password_hash, verify_password
+from app.modules.auth.schemas import UserCreate
 
 
 class AuthService:

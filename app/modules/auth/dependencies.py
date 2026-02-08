@@ -34,7 +34,7 @@ def get_current_user(
 			token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM]
 		)
 		user_id: str = payload.get("sub")
-		
+		print(payload)
 		if user_id is None:
 			raise credentials_exception
 		

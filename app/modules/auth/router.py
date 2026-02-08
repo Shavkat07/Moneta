@@ -5,7 +5,7 @@ from fastapi.security import OAuth2PasswordBearer
 
 from app.core.database import get_session  # Твоя функция подключения к БД
 from app.core.security import create_access_token
-from app.modules.auth.models import UserRead, UserCreate
+from app.modules.auth.schemas import UserRead, UserCreate
 from app.modules.auth.schemas import Token, LoginRequest
 from app.modules.auth.service import AuthService
 
