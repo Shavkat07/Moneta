@@ -23,7 +23,8 @@ class Settings(BaseSettings):
 	BASE_DIR: Path = Path(__file__).resolve().parent.parent.parent
 	
 	# Безопасность (сгенерируй новый ключ: `openssl rand -hex 32`)
-	SECRET_KEY: str
+	JWT_SECRET_KEY: str
+	ADMIN_SECRET_KEY: str
 	ALGORITHM: str
 	ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24 * 7  # 7 дней (чтобы не логиниться постоянно)
 	
