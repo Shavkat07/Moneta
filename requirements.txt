@@ -7,3 +7,9 @@ python-dotenv
 pandas
 catboost
 pytest
+
+sqlmodel
+passlib
+python-jose
+pydantic-settings
+httpx
