@@ -46,10 +46,10 @@ python-multipart==0.0.22
 rsa==4.9.1
 scipy==1.17.0
 six==1.17.0
-sqladmin==0.23.0
 SQLAlchemy==2.0.46
 sqlmodel==0.0.32
 starlette==0.52.1
+starlette-admin==0.16.0
 typing-inspection==0.4.2
 typing_extensions==4.15.0
 uvicorn==0.40.0

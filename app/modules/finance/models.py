@@ -7,6 +7,8 @@ from typing import Optional, List
 from sqlalchemy import Column, Numeric, DateTime, func  # Для точной настройки поля в БД
 from sqlmodel import SQLModel, Field, Relationship
 
+from app.modules.auth.models import User
+
 
 class WalletType(str, Enum):
 	CASH = "cash"
@@ -35,6 +37,9 @@ class Currency(SQLModel, table=True):
 	# Связь с историей курсов
 	rates: List["CurrencyRate"] = Relationship(back_populates="currency")
 	wallets: List["Wallet"] = Relationship(back_populates="currency_rel")
+	
+	def __str__(self):
+		return f"{self.char_code} ({self.name})"
 
 # --- История курсов ---
 class CurrencyRate(SQLModel, table=True):
@@ -78,6 +83,8 @@ class Category(SQLModel, table=True):
 	# Связь с транзакциями
 	transactions: List["Transaction"] = Relationship(back_populates="category")
 
+	def __str__(self):
+		return self.name
 
 class Wallet(SQLModel, table=True):
 	__tablename__ = "wallets"
@@ -98,8 +105,12 @@ class Wallet(SQLModel, table=True):
 	
 	# Связи
 	transactions: List["Transaction"] = Relationship(back_populates="wallet")
-
-
+	
+	user: Optional[User] = Relationship()
+	
+	def __str__(self):
+		return f"{self.name} ({self.balance})"
+	
 class Transaction(SQLModel, table=True):
 	__tablename__ = "transactions"
 	

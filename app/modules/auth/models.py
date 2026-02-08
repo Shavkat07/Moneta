@@ -57,6 +57,5 @@ class User(UserBase, table=True):
             nullable=False,
         )
     )
-
-	
-
+	def __str__(self) -> str:
+		return f"{self.full_name} +{self.phone_number}"
