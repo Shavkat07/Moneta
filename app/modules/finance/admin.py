@@ -37,21 +37,20 @@ class CurrencyRateAdmin(ModelView):
 
 class CategoryAdmin(ModelView):
 	fields = [
+		StringField("id", label="ID", exclude_from_create=True, exclude_from_edit=True),
 		StringField("name", label="Name"),
 		StringField("icon_slug", label="Icon Slug"),
 		
 		# Самоссылающаяся связь (Родительская категория)
 		HasOne("parent", label="Parent Category", identity="category"),
 		HasMany("children", label="Subcategories", identity="category"),
-		
-		# Показываем подкатегории (детей)
-		HasMany("children", label="Subcategories")
 	]
 	searchable_fields = ["name"]
 
 
 class WalletAdmin(ModelView):
 	fields = [
+		StringField("id", label="ID", exclude_from_create=True, exclude_from_edit=True),
 		HasOne("user", label="Owner", identity="user"),
 		StringField("name", label="Wallet Name"),
 		DecimalField("balance", label="Balance"),

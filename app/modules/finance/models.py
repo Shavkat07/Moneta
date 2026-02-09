@@ -150,7 +150,7 @@ class Transaction(SQLModel, table=True):
 	amount: Decimal = Field(sa_column=Column(Numeric(20, 2)))
 	type: TransactionType = Field(index=True)
 	
-	category_id: Optional[int] = Field(default=None, foreign_key="categories.id")
+	category_id: Optional[int] = Field(default=None, foreign_key="categories.id", nullable=True)
 	category: Optional["Category"] = Relationship(back_populates="transactions")
 	
 	merchant_name: Optional[str] = Field(default=None, max_length=150)
@@ -159,6 +159,7 @@ class Transaction(SQLModel, table=True):
 	is_halal_suspect: bool = Field(default=False, description="Флаг подозрительной транзакции (Халяль)")
 	
 	created_at: datetime = Field(
+		default=None,
 		sa_column=Column(
 			DateTime(timezone=True),
 			server_default=func.now(),

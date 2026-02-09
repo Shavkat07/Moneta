@@ -3,6 +3,8 @@ from decimal import Decimal
 from typing import Optional, List
 from uuid import UUID
 
+from pydantic import model_validator
+
 from app.modules.finance.models import WalletType, TransactionType
 from sqlmodel import SQLModel
 
@@ -71,18 +73,30 @@ class WalletRead(WalletBase):
 # --- TRANSACTION (Транзакции) ---
 
 class TransactionBase(SQLModel):
-    amount: Decimal
+    amount: Decimal = 0
     type: TransactionType
     category_id: Optional[int] = None
     merchant_name: Optional[str] = None
     raw_sms_text: Optional[str] = None
-    is_halal_suspect: bool = False
+    is_halal_suspect: bool = True
 
 class TransactionCreate(TransactionBase):
     wallet_id: int
-    # Дата может быть передана (если это импорт истории) или пропущена (тогда текущая)
-    created_at: Optional[datetime] = None
-
+    target_wallet_id: Optional[int] = None  # Нужно только для type="transfer"
+    
+    @model_validator(mode='after')
+    def validate_category_logic(self):
+        # 1. Если это расход или доход — требуем категорию
+        if self.type in (TransactionType.EXPENSE, TransactionType.INCOME):
+            if self.category_id is None:
+                raise ValueError("Для дохода или расхода необходимо выбрать категорию")
+        
+        # 2. Если это перевод — категория не нужна (принудительно ставим None)
+        elif self.type == TransactionType.TRANSFER:
+            self.category_id = None
+        
+        return self
+    
 class TransactionRead(TransactionBase):
     id: int
     wallet_id: int
