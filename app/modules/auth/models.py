@@ -1,10 +1,15 @@
 import uuid
-from datetime import datetime, UTC
+from datetime import datetime
 from enum import Enum
-from typing import Optional
+from typing import Optional, List, TYPE_CHECKING
 
 from sqlalchemy import Column, DateTime, func
-from sqlmodel import SQLModel, Field
+from sqlmodel import SQLModel, Field, Relationship
+from starlette.requests import Request
+
+# Импорт нужен только для проверки типов, чтобы не было круговой зависимости (ImportError)
+if TYPE_CHECKING:
+	from app.modules.finance.models import Wallet
 
 
 # --- ENUMS ---
@@ -50,12 +55,24 @@ class User(UserBase, table=True):
 	)
 	
 	updated_at: datetime = Field(
-        sa_column=Column(
-            DateTime(timezone=True),
-            server_default=func.now(),
-            onupdate=func.now(),
-            nullable=False,
-        )
-    )
+		sa_column=Column(
+			DateTime(timezone=True),
+			server_default=func.now(),
+			onupdate=func.now(),
+			nullable=False,
+		)
+	)
+	
+	wallets: List["Wallet"] = Relationship(back_populates="user")
+	
 	def __str__(self) -> str:
 		return f"{self.full_name} +{self.phone_number}"
+	
+	async def __admin_repr__(self, request: Request):
+		"""Отображение в таблицах и заголовках"""
+		return f"{self.full_name} ({self.phone_number})"
+	
+	async def __admin_select2_repr__(self, request: Request):
+		"""Отображение в выпадающем списке (HTML)"""
+		# Можно использовать HTML теги для красоты
+		return f"<div><span>{self.full_name}</span> <br><small class='text-muted'>{self.phone_number}</small></div>"

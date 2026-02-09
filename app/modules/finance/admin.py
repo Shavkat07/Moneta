@@ -1,107 +1,89 @@
-from sqladmin import ModelView
-from app.modules.finance.models import Wallet, Transaction, Category, Currency, CurrencyRate
+# app/modules/finance/admin.py
+from starlette_admin.contrib.sqla import ModelView
+from starlette_admin.fields import (
+	StringField,
+	IntegerField,
+	DecimalField,
+	DateField,
+	DateTimeField,
+	EnumField,
+	HasOne,
+	HasMany,
+	BooleanField,
+	TextAreaField
+)
+from app.modules.finance.models import Currency, CurrencyRate, Category, Wallet, Transaction, WalletType, \
+	TransactionType
 
 
-# --- 1. ВАЛЮТЫ (Currencies) ---
-class CurrencyAdmin(ModelView, model=Currency):
-	name = "Currency"
-	name_plural = "Currencies"
-	icon = "fa-solid fa-coins"
-	
-	column_list = [Currency.char_code, Currency.nominal, Currency.name, Currency.id]
-	form_columns = [Currency.code, Currency.char_code, Currency.name, Currency.nominal]
+class CurrencyAdmin(ModelView):
+	fields = [
+		StringField("char_code", label="ISO Code"),  # USD
+		StringField("code", label="Num Code"),  # 840
+		StringField("name", label="Name"),
+		IntegerField("nominal", label="Nominal"),
+	]
+	searchable_fields = ["char_code", "name"]
 
 
-# --- 2. КУРСЫ ВАЛЮТ (Exchange Rates) ---
-class CurrencyRateAdmin(ModelView, model=CurrencyRate):
-	name = "Exchange Rate"
-	name_plural = "Exchange Rates"
-	icon = "fa-solid fa-chart-line"
-	
-	# "currency.char_code" работает, потому что есть связь relationship в модели
-	column_list = [CurrencyRate.date, "currency.char_code", CurrencyRate.rate]
-	
-	# Сортируем по дате (свежие сверху)
-	column_default_sort = ("date", True)
-	
-	form_columns = [CurrencyRate.currency, CurrencyRate.date, CurrencyRate.rate]
+class CurrencyRateAdmin(ModelView):
+	fields = [
+		DateField("date", label="Date"),
+		HasOne("currency", label="Currency", identity="currency"),
+		DecimalField("rate", label="Rate"),
+	]
+	sortable_fields = ["date"]
+	# Сортировка по умолчанию: новые сверху
+	page_size = 20
 
 
-# --- 3. КАТЕГОРИИ (Categories) ---
-class CategoryAdmin(ModelView, model=Category):
-	name = "Category"
-	name_plural = "Categories"
-	icon = "fa-solid fa-layer-group"
-	
-	column_list = [Category.name, "parent.name", Category.icon_slug]
-	
-	# Позволяет выбирать родителя из выпадающего списка
-	form_columns = [Category.name, Category.parent, Category.icon_slug]
+class CategoryAdmin(ModelView):
+	fields = [
+		StringField("name", label="Name"),
+		StringField("icon_slug", label="Icon Slug"),
+		
+		# Самоссылающаяся связь (Родительская категория)
+		HasOne("parent", label="Parent Category", identity="category"),
+		HasMany("children", label="Subcategories", identity="category"),
+		
+		# Показываем подкатегории (детей)
+		HasMany("children", label="Subcategories")
+	]
+	searchable_fields = ["name"]
 
 
-# --- 4. КОШЕЛЬКИ (Wallets) ---
-class WalletAdmin(ModelView, model=Wallet):
-	name = "Wallet"
-	name_plural = "Wallets"
-	icon = "fa-solid fa-wallet"
-	
-	# Выводим телефон владельца, имя кошелька, баланс и валюту
-	column_list = [
-		"user.phone_number",
-		Wallet.name,
-		Wallet.balance,
-		"currency_rel.char_code",
-		Wallet.type
+class WalletAdmin(ModelView):
+	fields = [
+		HasOne("user", label="Owner", identity="user"),
+		StringField("name", label="Wallet Name"),
+		DecimalField("balance", label="Balance"),
+		HasOne("currency_rel", label="Currency", identity="currency"),
+		EnumField("type", label="Type", enum=WalletType),
+	]
+	searchable_fields = ["name", "user.phone_number"]
+	list_per_page = 20
+
+
+class TransactionAdmin(ModelView):
+	fields = [
+		StringField("id", label="ID", exclude_from_create=True, exclude_from_edit=True),
+		
+		DateTimeField("created_at", label="Created At"),
+		
+		EnumField("type", label="Type", enum=TransactionType),
+		DecimalField("amount", label="Amount"),
+		
+		HasOne("wallet", label="Wallet", identity="wallet"),
+		HasOne("category", label="Category", identity="category"),
+		
+		StringField("merchant_name", label="Merchant"),
+		TextAreaField("raw_sms_text", label="SMS Raw Text"),
+		BooleanField("is_halal_suspect", label="Halal Check"),
 	]
 	
-	# Поиск по имени кошелька
-	column_searchable_list = [Wallet.name]
+	# Мощный фильтр для поиска
+	searchable_fields = ["merchant_name", "wallet.name", "amount"]
+	sortable_fields = ["created_at", "amount"]
 	
-	# Форма для создания/редактирования
-	form_columns = [
-		Wallet.user,  # Выпадающий список юзеров (благодаря __str__ в User)
-		Wallet.name,
-		Wallet.type,
-		Wallet.currency_rel,  # Выпадающий список валют
-		Wallet.balance
-	]
-
-
-# --- 5. ТРАНЗАКЦИИ (Transactions) ---
-class TransactionAdmin(ModelView, model=Transaction):
-	name = "Transaction"
-	name_plural = "Transactions"
-	icon = "fa-solid fa-money-bill-transfer"
-	
-	column_list = [
-		Transaction.id,
-		Transaction.amount,
-		Transaction.type,
-		"wallet.name",  # Имя кошелька
-		"category.name",  # Имя категории
-		Transaction.created_at
-	]
-	
-	column_default_sort = ("created_at", True)
-	
-	# Поиск по мерчанту (магазину)
-	column_searchable_list = [Transaction.merchant_name]
-	
-	# # ИСПРАВЛЕНИЕ: Убран Transaction.type из фильтров, так как он вызывает ошибку
-	# # Оставляем только те поля, которые sqladmin точно умеет фильтровать (даты, числа, id)
-	# column_filters = [
-	# 	Transaction.created_at,
-	# 	Transaction.amount,
-	# 	Transaction.wallet_id
-	# ]
-	
-	form_columns = [
-		Transaction.wallet,  # Выбор кошелька
-		Transaction.category,  # Выбор категории
-		Transaction.amount,
-		Transaction.type,  # Здесь (в форме) Enum работает нормально!
-		Transaction.merchant_name,
-		Transaction.created_at,
-		Transaction.is_halal_suspect,
-		Transaction.raw_sms_text
-	]
+	# Запрещаем редактирование ID и Даты создания (обычно это не меняют)
+	exclude_fields_from_create = ["created_at"]

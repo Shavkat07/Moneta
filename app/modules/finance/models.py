@@ -6,6 +6,7 @@ from typing import Optional, List
 
 from sqlalchemy import Column, Numeric, DateTime, func  # Для точной настройки поля в БД
 from sqlmodel import SQLModel, Field, Relationship
+from starlette.requests import Request
 
 from app.modules.auth.models import User
 
@@ -40,6 +41,12 @@ class Currency(SQLModel, table=True):
 	
 	def __str__(self):
 		return f"{self.char_code} ({self.name})"
+	
+	async def __admin_repr__(self, request: Request):
+		return f"{self.char_code} ({self.name})"
+	
+	async def __admin_select2_repr__(self, request: Request):
+		return f"<span><strong>{self.char_code}</strong> - {self.name}</span>"
 
 # --- История курсов ---
 class CurrencyRate(SQLModel, table=True):
@@ -58,6 +65,14 @@ class CurrencyRate(SQLModel, table=True):
 	# Обратная связь
 	currency: "Currency" = Relationship(back_populates="rates")
 	
+	def __str__(self):
+		return f"{self.date}: {self.rate}"
+	
+	async def __admin_repr__(self, request: Request):
+		return f"{self.date}: {self.rate}"
+	
+	async def __admin_select2_repr__(self, request: Request):
+		return f"<div><strong>{self.rate}</strong> <br><small class='text-muted'>Date: {self.date}</small></div>"
 
 class Category(SQLModel, table=True):
 	__tablename__ = "categories"
@@ -82,9 +97,16 @@ class Category(SQLModel, table=True):
 	
 	# Связь с транзакциями
 	transactions: List["Transaction"] = Relationship(back_populates="category")
-
+	
 	def __str__(self):
 		return self.name
+	
+	async def __admin_repr__(self, request: Request):
+		return self.name
+	
+	async def __admin_select2_repr__(self, request: Request):
+		icon = f"<i class='{self.icon_slug}'></i> " if self.icon_slug else ""
+		return f"<span>{icon}{self.name}</span>"
 
 class Wallet(SQLModel, table=True):
 	__tablename__ = "wallets"
@@ -106,10 +128,16 @@ class Wallet(SQLModel, table=True):
 	# Связи
 	transactions: List["Transaction"] = Relationship(back_populates="wallet")
 	
-	user: Optional[User] = Relationship()
+	user: Optional[User] = Relationship(back_populates="wallets")
 	
 	def __str__(self):
 		return f"{self.name} ({self.balance})"
+	
+	async def __admin_repr__(self, request: Request):
+		return f"{self.name}"
+	
+	async def __admin_select2_repr__(self, request: Request):
+		return f"<div><strong>{self.name}</strong><br><small>Balance: {self.balance}</small></div>"
 	
 class Transaction(SQLModel, table=True):
 	__tablename__ = "transactions"
@@ -137,3 +165,27 @@ class Transaction(SQLModel, table=True):
 			nullable=False,
 		)
 	)
+	
+	def __str__(self):
+		desc = self.merchant_name or self.type.value
+		return f"{self.amount} - {desc}"
+	
+	async def __admin_repr__(self, request: Request):
+		# Если есть имя мерчанта - показываем его, иначе тип транзакции
+		desc = self.merchant_name if self.merchant_name else self.type.value.capitalize()
+		return f"{self.amount} ({desc})"
+	
+	async def __admin_select2_repr__(self, request: Request):
+		# Красим сумму: Зеленый для доходов, Красный для расходов
+		color_class = "text-success" if self.type == TransactionType.INCOME else "text-danger"
+		
+		desc = self.merchant_name if self.merchant_name else self.type.value.capitalize()
+		date_str = self.created_at.strftime("%Y-%m-%d %H:%M")
+		
+		return (
+			f"<div>"
+			f"<strong class='{color_class}'>{self.amount}</strong> "
+			f"<span> - {desc}</span><br>"
+			f"<small class='text-muted'>{date_str}</small>"
+			f"</div>"
+		)

@@ -5,7 +5,7 @@ from contextlib import asynccontextmanager
 from sqlmodel import Session
 
 from app.api.router import api_router
-from app.core.admin import setup_admin
+from app.core.admin import create_admin
 from app.core.database import create_db_and_tables, engine
 from app.core.init_data import init_base_currency
 
@@ -32,4 +32,5 @@ app = FastAPI(
 # Подключаем роутеры
 app.include_router(api_router, prefix='/api/v1')
 
-setup_admin(app)
+admin = create_admin()
+admin.mount_to(app)
