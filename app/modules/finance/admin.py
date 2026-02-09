@@ -12,8 +12,7 @@ from starlette_admin.fields import (
 	BooleanField,
 	TextAreaField
 )
-from app.modules.finance.models import Currency, CurrencyRate, Category, Wallet, Transaction, WalletType, \
-	TransactionType
+from app.modules.finance.models import WalletType, TransactionType
 
 
 class CurrencyAdmin(ModelView):
@@ -33,7 +32,6 @@ class CurrencyRateAdmin(ModelView):
 		DecimalField("rate", label="Rate"),
 	]
 	sortable_fields = ["date"]
-	# Сортировка по умолчанию: новые сверху
 	page_size = 20
 
 
@@ -85,5 +83,4 @@ class TransactionAdmin(ModelView):
 	searchable_fields = ["merchant_name", "wallet.name", "amount"]
 	sortable_fields = ["created_at", "amount"]
 	
-	# Запрещаем редактирование ID и Даты создания (обычно это не меняют)
 	exclude_fields_from_create = ["created_at"]
