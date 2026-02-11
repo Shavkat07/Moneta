@@ -166,6 +166,12 @@ class Transaction(SQLModel, table=True):
 			nullable=False,
 		)
 	)
+
+	# Self-referencing Foreign Key
+	related_transaction_id: Optional[int] = Field(default=None, foreign_key="transactions.id")
+	related_transaction: Optional["Transaction"] = Relationship(
+		sa_relationship_kwargs={"remote_side": "Transaction.id"}
+	)
 	
 	def __str__(self):
 		desc = self.merchant_name or self.type.value

@@ -150,16 +150,17 @@ def create_transaction(
 		current_user: User = Depends(get_current_user)
 ):
 	# 1. Блокируем исходный кошелек
-	statement = select(Wallet).where(Wallet.id == transaction_in.wallet_id).with_for_update()
+	print(f"DEBUG: Locking wallet {transaction_in.wallet_id}...")
+	statement = select(Wallet).where(Wallet.id == transaction_in.wallet_id)#.with_for_update()
 	wallet = session.exec(statement).one_or_none()
-	
-	
+	print(f"DEBUG: Wallet locked: {wallet}")
+
 	if not wallet or wallet.user_id != current_user.id:
 		raise HTTPException(status_code=404, detail="Кошелек не найден или нет доступа")
 	
 	# Инициализируем сервис конвертации
 	currency_service = CurrencyService(session)
-	
+	income_transaction = None
 	
 	if transaction_in.type == TransactionType.INCOME:
 		wallet.balance += transaction_in.amount
@@ -172,7 +173,7 @@ def create_transaction(
 			raise HTTPException(status_code=400, detail="Для перевода нужен target_wallet_id")
 		
 		# Блокируем целевой кошелек
-		target_stmt = select(Wallet).where(Wallet.id == transaction_in.target_wallet_id).with_for_update()
+		target_stmt = select(Wallet).where(Wallet.id == transaction_in.target_wallet_id)#.with_for_update()
 		target_wallet = session.exec(target_stmt).one_or_none()
 		
 		if not target_wallet:
@@ -201,7 +202,7 @@ def create_transaction(
 		income_transaction = Transaction(
 			wallet_id=target_wallet.id,
 			amount=converted_amount,  # <-- ВАЖНО: сохраняем уже в валюте кошелька-получателя
-			type=TransactionType.TRANSFER,
+			type=TransactionType.INCOME, # Исправлено: для получателя это доход
 			category_id=None,
 			merchant_name=f"Перевод от {wallet.name}{desc_suffix}",
 			created_at=datetime.now(UTC),
@@ -209,19 +210,28 @@ def create_transaction(
 		)
 		session.add(income_transaction)
 		session.add(target_wallet)
-		
+		session.flush() # Получаем ID
+
 		if not transaction_in.merchant_name:
 			transaction_in.merchant_name = f"Перевод на {target_wallet.name}"
 
 	transaction_data = transaction_in.model_dump(exclude={"target_wallet_id"})
 	
 	transaction = Transaction(**transaction_data)
-	
+	if income_transaction:
+		transaction.related_transaction_id = income_transaction.id
+
 	session.add(transaction)
 	session.add(wallet)
-	
 	session.commit()
 	session.refresh(transaction)
+
+	# Update related transaction to link back
+	if income_transaction:
+		income_transaction.related_transaction_id = transaction.id
+		session.add(income_transaction)
+		session.commit()
+
 	return transaction
 
 @router.get("/transactions", response_model=List[TransactionRead], summary="История операций")
@@ -266,15 +276,38 @@ def delete_transaction(
 	if not wallet or wallet.user_id != current_user.id:
 		raise HTTPException(status_code=403, detail="Нет доступа")
 	
-	# 3. Откат баланса (обратная логика)
-	if transaction.type == TransactionType.EXPENSE:
-		# Если удаляем расход, значит деньги возвращаются
+	# 3. Handle Linked Transaction
+	if transaction.related_transaction_id:
+		related = session.get(Transaction, transaction.related_transaction_id)
+		if related:
+			# Revert related balance
+			related_wallet = session.get(Wallet, related.wallet_id)
+			if related_wallet:
+				if related.type in [TransactionType.EXPENSE, TransactionType.TRANSFER]:
+					related_wallet.balance += related.amount
+				elif related.type == TransactionType.INCOME:
+					related_wallet.balance -= related.amount
+				session.add(related_wallet)
+			
+			# Break link to avoid FK constraint issues
+			related.related_transaction_id = None
+			session.add(related)
+			session.delete(related)
+	
+	# Break link on current transaction too
+	transaction.related_transaction_id = None
+	session.add(transaction)
+	session.flush() # Retrieve/Apply changes
+
+	# 4. Откат баланса (обратная логика)
+	if transaction.type in [TransactionType.EXPENSE, TransactionType.TRANSFER]:
+		# Если удаляем расход или перевод, возвращаем деньги
 		wallet.balance += transaction.amount
 	elif transaction.type == TransactionType.INCOME:
-		# Если удаляем доход, значит деньги уходят
+		# Если удаляем доход, списываем деньги
 		wallet.balance -= transaction.amount
 	
-	# 4. Удаляем и сохраняем
+	# 5. Удаляем и сохраняем
 	session.delete(transaction)
 	session.add(wallet)
 	session.commit()
