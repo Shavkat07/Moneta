@@ -11,7 +11,7 @@ from app.modules.auth.models import User
 from app.modules.finance.models import (
 	Currency, CurrencyRate,
 	Category, Wallet, Transaction,
-	TransactionType
+	TransactionType, WalletType
 )
 from app.modules.finance.schemas import (
 	CurrencyRateResponse,
@@ -22,6 +22,17 @@ from app.modules.finance.services.currency_parser import CurrencyClient
 from app.modules.finance.services.currency_service import CurrencyService
 
 router = APIRouter()
+
+
+def _check_sufficient_funds(wallet: Wallet, amount) -> None:
+	"""Проверяет, что на кошельке достаточно средств.
+	Для кредитных карт (CARD) минус разрешён."""
+	if wallet.type != WalletType.CARD and wallet.balance < amount:
+		raise HTTPException(
+			status_code=400,
+			detail=f"Недостаточно средств на кошельке '{wallet.name}'. "
+			        f"Баланс: {wallet.balance}, требуется: {amount}"
+		)
 
 
 # ==========================================
@@ -166,6 +177,7 @@ def create_transaction(
 		wallet.balance += transaction_in.amount
 	
 	elif transaction_in.type == TransactionType.EXPENSE:
+		_check_sufficient_funds(wallet, transaction_in.amount)
 		wallet.balance -= transaction_in.amount
 	
 	elif transaction_in.type == TransactionType.TRANSFER:
@@ -181,6 +193,7 @@ def create_transaction(
 		
 		# --- ЛОГИКА КОНВЕРТАЦИИ ---
 		# 1. Снимаем сумму с исходного кошелька (в его валюте)
+		_check_sufficient_funds(wallet, transaction_in.amount)
 		wallet.balance -= transaction_in.amount
 		
 		# 2. Считаем, сколько это будет в валюте получателя
@@ -286,6 +299,7 @@ def delete_transaction(
 				if related.type in [TransactionType.EXPENSE, TransactionType.TRANSFER]:
 					related_wallet.balance += related.amount
 				elif related.type == TransactionType.INCOME:
+					_check_sufficient_funds(related_wallet, related.amount)
 					related_wallet.balance -= related.amount
 				session.add(related_wallet)
 			
@@ -305,6 +319,7 @@ def delete_transaction(
 		wallet.balance += transaction.amount
 	elif transaction.type == TransactionType.INCOME:
 		# Если удаляем доход, списываем деньги
+		_check_sufficient_funds(wallet, transaction.amount)
 		wallet.balance -= transaction.amount
 	
 	# 5. Удаляем и сохраняем

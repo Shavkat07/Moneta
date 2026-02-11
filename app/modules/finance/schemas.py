@@ -3,10 +3,20 @@ from decimal import Decimal
 from typing import Optional, List
 from uuid import UUID
 
-from pydantic import model_validator
+from pydantic import ConfigDict, model_validator
 
 from app.modules.finance.models import WalletType, TransactionType
 from sqlmodel import SQLModel
+
+
+# ==========================================
+# Конфиг для корректной сериализации Decimal
+# ==========================================
+# Decimal → str в JSON, чтобы не терять копейки (float неточен для денег).
+# Фронтенд может использовать parseFloat() для графиков или отображать как есть.
+_money_model_config = ConfigDict(
+    json_encoders={Decimal: lambda v: str(v)}
+)
 
 
 # 1. Схема для ПАРСИНГА данных с API ЦБ (сырые данные)
@@ -44,6 +54,7 @@ class CategoryRead(CategoryBase):
     
 
 
+
 # --- WALLET (Кошельки) ---
 
 class WalletBase(SQLModel):
@@ -62,12 +73,15 @@ class WalletUpdate(SQLModel):
     balance: Optional[Decimal] = None
 
 class WalletRead(WalletBase):
+    model_config = _money_model_config
+
     id: int
     balance: Decimal
     user_id: UUID
     # Можно добавить поле currency_code, чтобы фронту не искать по ID
     currency: Optional[str] = None
     
+
 
 
 # --- TRANSACTION (Транзакции) ---
@@ -98,6 +112,8 @@ class TransactionCreate(TransactionBase):
         return self
     
 class TransactionRead(TransactionBase):
+    model_config = _money_model_config
+
     id: int
     wallet_id: int
     created_at: datetime
