@@ -83,3 +83,4 @@ class TransactionAdmin(ModelView):
 	sortable_fields = ["created_at", "amount"]
 	
 	exclude_fields_from_create = ["created_at"]
+
