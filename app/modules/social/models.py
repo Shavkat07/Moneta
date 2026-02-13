@@ -9,10 +9,6 @@ from sqlmodel import SQLModel, Field, Relationship
 from starlette.requests import Request
 
 
-# Импорты из твоих прошлых файлов (предполагаем пути)
-# from app.modules.auth.models import User
-# from app.modules.finance.models import Currency
-
 class DebtType(str, Enum):
 	GIVEN = "given"  # Я дал (мне должны)
 	TAKEN = "taken"  # Я взял (я должен)
