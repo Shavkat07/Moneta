@@ -1,11 +1,11 @@
 from datetime import date
+from decimal import Decimal
 from typing import List
 
 from fastapi import Depends, HTTPException, APIRouter
 from sqlmodel import Session, select
 
 from app.core.database import get_session
-
 from app.modules.finance.models import (
 	Currency, CurrencyRate,
 )
@@ -17,6 +17,7 @@ from app.modules.finance.services.currency_parser import CurrencyClient
 # ==========================================
 
 router = APIRouter()
+
 
 @router.post("/refresh-currency")
 async def refresh_currency_rates(session: Session = Depends(get_session)):
@@ -32,35 +33,34 @@ async def refresh_currency_rates(session: Session = Depends(get_session)):
 def get_latest_rates(session: Session = Depends(get_session)):
 	"""Берет строго последние курсы для каждой валюты"""
 	
-	statement = (
-		select(CurrencyRate)
-		# DISTINCT ON оставляет только первую строку из группы дубликатов
+	# 1. Запрос курсов (Distinct on currency_id, сортировка по дате desc)
+	stmt = (
+		select(CurrencyRate, Currency)
+		.join(Currency)
 		.distinct(CurrencyRate.currency_id)
-		# Сначала сортируем по ID валюты (требование DISTINCT ON в Postgres),
-		# потом по дате (чтобы первая строка была самой свежей)
 		.order_by(CurrencyRate.currency_id, CurrencyRate.date.desc())
 	)
 	
-	rates = session.exec(statement).all()
+	results = session.exec(stmt).all()
 	
-	response = []
-	for r in rates:
-		# Обратите внимание: в вашей схеме CurrencyRateResponse (в schemas.py)
-		# может не быть поля 'id', проверьте это.
-		response.append(CurrencyRateResponse(
-			currency=r.currency.char_code,
-			rate=r.rate,
-			date=r.date
+	response_list = []
+	
+	# 2. Формируем ответ
+	for rate_obj, currency_obj in results:
+		response_list.append(CurrencyRateResponse(
+			currency=currency_obj.char_code,
+			name=currency_obj.name,
+			rate=rate_obj.rate,  # Это цена за 1 единицу
+			date=rate_obj.date
 		))
 	
-	uzs_currency = session.exec(select(Currency).where(Currency.char_code == "UZS")).first()
+	# 3. Добавляем базовую валюту UZS (которой нет в таблице rates, но она нужна фронту)
+	# Находим или создаем объект для правильного нейминга, если нужно, или хардкодим
+	response_list.insert(0, CurrencyRateResponse(
+		currency="UZS",
+		name="Узбекский сум",
+		rate=Decimal("1.00"),
+		date=date.today()
+	))
 	
-	if uzs_currency:
-		# Добавляем фиктивную запись курса для UZS
-		response.insert(0, CurrencyRateResponse(
-			currency="UZS",
-			rate=1.00,
-			date=date.today()  # Дата - сегодня
-		))
-	
-	return response
+	return response_list

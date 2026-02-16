@@ -20,14 +20,45 @@ _money_model_config = ConfigDict(
 
 # 1. Схема для ПАРСИНГА данных с API ЦБ (сырые данные)
 # Поля названы так, как приходят от cbu.uz
-class CurrencySchema(SQLModel):
+class CbuCurrencyItem(SQLModel):
     id: int
-    Code: str        # "840"
-    Ccy: str         # "USD"
-    CcyNm_RU: str    # "Доллар США"
-    Nominal: str     # "1" (строкой приходит)
-    Rate: str        # "12047.45" (строкой приходит)
-    Date: str        # "12.12.2025"
+    # Используем alias, чтобы мапить ключи JSON (Code) в поля Python (code)
+    code: str = Field(alias="Code")  # "840"
+    char_code: str = Field(alias="Ccy")  # "USD"
+    name_ru: str = Field(alias="CcyNm_RU")  # "Доллар США"
+    
+    # Принимаем строками, валидатор переделает в числа
+    nominal_raw: str = Field(alias="Nominal")
+    rate_raw: str = Field(alias="Rate")
+    date_raw: str = Field(alias="Date")
+    
+    @property
+    def nominal(self) -> int:
+        return int(self.nominal_raw)
+    
+    @property
+    def rate(self) -> Decimal:
+        # Заменяем запятую на точку, если вдруг ЦБ сменит формат
+        clean_rate = self.rate_raw.replace(",", ".")
+        return Decimal(clean_rate)
+    
+    @property
+    def parsed_date(self) -> date:
+        from datetime import datetime
+        return datetime.strptime(self.date_raw, "%d.%m.%Y").date()
+    
+    # Pydantic конфиг для игнорирования лишних полей (Diff, CcyNm_UZ и т.д.)
+    model_config = ConfigDict(extra="ignore", populate_by_name=True)
+
+
+# class CurrencySchema(SQLModel):
+#     id: int
+#     Code: str        # "840"
+#     Ccy: str         # "USD"
+#     CcyNm_RU: str    # "Доллар США"
+#     Nominal: str     # "1" (строкой приходит)
+#     Rate: str        # "12047.45" (строкой приходит)
+#     Date: str        # "12.12.2025"
 
 # 2. Схема для ОТДАЧИ данных на наш фронтенд
 class CurrencyRateResponse(SQLModel):
@@ -35,6 +66,9 @@ class CurrencyRateResponse(SQLModel):
     rate: float
     date: date
     
+    model_config = ConfigDict(
+        json_encoders={Decimal: lambda v: v.to_eng_string()}
+    )
     
 
 # --- CATEGORY (Категории) ---
@@ -79,7 +113,7 @@ class WalletRead(WalletBase):
     model_config = _money_model_config
 
     id: int
-    balance: Decimal
+    balance: Decimal = Decimal("0.00")
     user_id: UUID
 
     

@@ -28,7 +28,7 @@ def _check_sufficient_funds(wallet: Wallet, amount) -> None:
 			        f"Баланс: {wallet.balance}, требуется: {amount}"
 		)
 
-@router.post("/transactions", response_model=TransactionRead, status_code=201, summary="Добавить операцию")
+@router.post("/", response_model=TransactionRead, status_code=201, summary="Добавить операцию")
 def create_transaction(
 		transaction_in: TransactionCreate,
 		session: Session = Depends(get_session),
@@ -122,7 +122,7 @@ def create_transaction(
 	return transaction
 
 
-@router.get("/transactions", response_model=List[TransactionRead], summary="История операций")
+@router.get("/all", response_model=List[TransactionRead], summary="История операций")
 def get_transactions(
 		wallet_id: int = None,  # Опциональный фильтр по кошельку
 		skip: int = 0,
@@ -144,8 +144,39 @@ def get_transactions(
 	transactions = session.exec(query).all()
 	return transactions
 
+@router.get("/{transaction_id}", response_model=TransactionRead, summary="Детали операции")
+def get_transaction(
+		transaction_id: int,
+		session: Session = Depends(get_session),
+		current_user: User = Depends(get_current_user)
+):
+	"""Выводит все детали одной транзакции по id."""
+	transaction = session.get(Transaction, transaction_id)
+	
+	if not transaction:
+		raise HTTPException(status_code=404, detail="Транзакция не найдена")
+	
+	wallet = session.get(Wallet, transaction.wallet_id)
+	if not wallet or wallet.user_id != current_user.id:
+		raise HTTPException(status_code=403, detail="Нет доступа")
 
-@router.delete("/transactions/{transaction_id}", summary="Удалить/Отменить операцию")
+	pass
+
+
+@router.put("/{transaction_id}", response_model=List[TransactionRead], summary="История операций")
+def put_transaction(
+		transaction_id: int,
+		session: Session = Depends(get_session),
+		current_user: User = Depends(get_current_user)
+):
+	pass
+@router.patch("/{transaction_id}", response_model=List[TransactionRead], summary="История операций")
+def patch_transaction(
+		transaction_id: int,
+):
+	pass
+
+@router.delete("/{transaction_id}", summary="Удалить/Отменить операцию")
 def delete_transaction(
 		transaction_id: int,
 		session: Session = Depends(get_session),

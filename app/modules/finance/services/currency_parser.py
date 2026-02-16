@@ -4,15 +4,18 @@ from datetime import datetime
 from sqlmodel import Session, select
 
 from app.modules.finance.models import Currency, CurrencyRate
+from app.modules.finance.schemas import CbuCurrencyItem
 
 # Убедись, что CurrencySchema тоже поддерживает Decimal или просто строку,
 # но здесь мы берем данные напрямую из response.json() для чистоты примера.
 
 CBU_URL = "https://cbu.uz/uz/arkhiv-kursov-valyut/json/"
 
+TARGET_CURRENCIES = {"USD", "EUR", "RUB", "CNY", "GBP", "JPY", "CHF", "KRW", "AZN", "KZT"}
+
 
 class CurrencyClient:
-	async def fetch_rates(self):
+	async def fetch_rates(self) -> list[dict]:
 		async with httpx.AsyncClient() as client:
 			response = await client.get(CBU_URL)
 			response.raise_for_status()
@@ -22,50 +25,62 @@ class CurrencyClient:
 		raw_data = await self.fetch_rates()
 		updated_count = 0
 		
-		# Основные валюты для отслеживания
-		target_char_codes = ["USD", "EUR", "RUB", "CNY", "GBP", "JPY", "CHF", "KRW", "AZN", "KZT"]
+		# 1. Загружаем все существующие валюты в словарь для быстрого поиска
+		# Ключ: char_code ('USD'), Значение: Currency object
+		existing_currencies = {
+			c.char_code: c for c in session.exec(select(Currency)).all()
+		}
 		
-		for item in raw_data:
-			# Получаем код валюты (например, "USD")
-			code_char = item.get("Ccy")
+		for item_dict in raw_data:
+			# Валидируем и парсим через Pydantic (безопасно)
+			try:
+				cbu_item = CbuCurrencyItem(**item_dict)
+			except Exception:
+				continue  # Пропускаем битые данные
 			
-			if code_char not in target_char_codes:
+			if cbu_item.char_code not in TARGET_CURRENCIES:
 				continue
 			
-			# 1. Поиск валюты в БД
-			statement = select(Currency).where(Currency.char_code == code_char)
-			currency = session.exec(statement).first()
+			# --- Логика Валюты ---
+			currency = existing_currencies.get(cbu_item.char_code)
 			
-			# Если валюты нет - создаем
 			if not currency:
+				# Создаем новую валюту
 				currency = Currency(
-					code=item.get("Code"),
-					char_code=code_char,
-					name=item.get("CcyNm_RU"),  # Или CcyNm_UZ, если хочешь на узбекском
-					nominal=int(item.get("Nominal"))
+					code=cbu_item.code,
+					char_code=cbu_item.char_code,
+					name=cbu_item.name_ru,
+					nominal=cbu_item.nominal
 				)
 				session.add(currency)
 				session.commit()
 				session.refresh(currency)
+				# Добавляем в локальный кэш
+				existing_currencies[cbu_item.char_code] = currency
+			else:
+				# Обновляем номинал, если вдруг ЦБ его изменил
+				if currency.nominal != cbu_item.nominal:
+					currency.nominal = cbu_item.nominal
+					session.add(currency)
 			
-			# 2. Обработка данных (Дата и Курс)
-			rate_date = datetime.strptime(item.get("Date"), "%d.%m.%Y").date()
+			# --- Логика Курса (САМОЕ ВАЖНОЕ) ---
+			# Нормализация: Вычисляем цену за 1 единицу
+			# Пример: ЦБ дает JPY Nominal=10, Rate=800. Значит реальный курс 1 JPY = 80.
+			normalized_rate = cbu_item.rate / Decimal(cbu_item.nominal)
 			
-			# ВАЖНО: Конвертируем строку сразу в Decimal
-			rate_value = Decimal(item.get("Rate"))
-			
-			# 3. Проверка на дубликат (чтобы не записывать курс дважды за один день)
-			stmt_rate = select(CurrencyRate).where(
+			# Проверяем, есть ли уже курс на эту дату
+			# (Можно оптимизировать, загрузив и рейты в память, но дат много, лучше точечно)
+			stmt_check = select(CurrencyRate).where(
 				CurrencyRate.currency_id == currency.id,
-				CurrencyRate.date == rate_date
+				CurrencyRate.date == cbu_item.parsed_date
 			)
-			existing_rate = session.exec(stmt_rate).first()
+			existing_rate = session.exec(stmt_check).first()
 			
 			if not existing_rate:
 				new_rate = CurrencyRate(
 					currency_id=currency.id,
-					rate=rate_value,
-					date=rate_date
+					rate=normalized_rate,  # Пишем "чистый" курс
+					date=cbu_item.parsed_date
 				)
 				session.add(new_rate)
 				updated_count += 1

@@ -59,7 +59,7 @@ class CurrencyRate(SQLModel, table=True):
 	
 	# ВАЖНО: Используем Decimal и Numeric(20, 4)
 	# Это позволяет хранить курсы типа 12750.45 или 0.0045 без потери точности
-	rate: Decimal = Field(sa_column=Column(Numeric(20, 4)))
+	rate: Decimal = Field(sa_column=Column(Numeric(20, 6)))
 	
 	# Дата курса
 	date: date_type = Field(index=True)
