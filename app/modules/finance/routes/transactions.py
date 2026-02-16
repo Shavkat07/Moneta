@@ -103,7 +103,9 @@ def create_transaction(
 			transaction_in.merchant_name = f"Перевод на {target_wallet.name}"
 	
 	transaction_data = transaction_in.model_dump(exclude={"target_wallet_id"})
-	
+	if transaction_data.get("category_id") == 0:
+		transaction_data['category_id'] = None
+		
 	transaction = Transaction(**transaction_data)
 	if income_transaction:
 		transaction.related_transaction_id = income_transaction.id

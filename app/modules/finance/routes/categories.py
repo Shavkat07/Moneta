@@ -26,7 +26,14 @@ def create_category(
 		current_user: User = Depends(get_current_user)  # Требуем авторизацию
 ):
 	# Можно добавить проверку: только админ может создавать глобальные категории
-	category = Category.model_validate(category_in)
+	category_data = category_in.model_dump()
+	
+	if category_data.get("parent_id") == 0:
+		category_data["parent_id"] = None
+	
+	# Создаем объект модели SQLAlchemy из очищенных данных
+	category = Category(**category_data)
+	
 	session.add(category)
 	session.commit()
 	session.refresh(category)
