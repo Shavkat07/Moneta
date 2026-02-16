@@ -4,6 +4,7 @@ from decimal import Decimal
 from enum import Enum
 from typing import Optional, List
 
+from pydantic import ConfigDict
 from sqlalchemy import Column, Numeric, DateTime, func  # Для точной настройки поля в БД
 from sqlmodel import SQLModel, Field, Relationship
 from starlette.requests import Request
@@ -48,6 +49,7 @@ class Currency(SQLModel, table=True):
 	async def __admin_select2_repr__(self, request: Request):
 		return f"<span><strong>{self.char_code}</strong> - {self.name}</span>"
 
+
 # --- История курсов ---
 class CurrencyRate(SQLModel, table=True):
 	__tablename__ = "currency_rates"
@@ -73,6 +75,7 @@ class CurrencyRate(SQLModel, table=True):
 	
 	async def __admin_select2_repr__(self, request: Request):
 		return f"<div><strong>{self.rate}</strong> <br><small class='text-muted'>Date: {self.date}</small></div>"
+
 
 class Category(SQLModel, table=True):
 	__tablename__ = "categories"
@@ -108,8 +111,10 @@ class Category(SQLModel, table=True):
 		icon = f"<i class='{self.icon_slug}'></i> " if self.icon_slug else ""
 		return f"<span>{icon}{self.name}</span>"
 
+
 class Wallet(SQLModel, table=True):
 	__tablename__ = "wallets"
+	model_config = ConfigDict(json_encoders={Decimal: str})
 	
 	id: Optional[int] = Field(default=None, primary_key=True)
 	
@@ -117,7 +122,7 @@ class Wallet(SQLModel, table=True):
 	user_id: uuid.UUID = Field(foreign_key="users.id", index=True)
 	
 	name: str = Field(max_length=100)
-	balance: Decimal = Field(default=0, sa_column=Column(Numeric(20, 2)))
+	balance: Decimal = Field(default="0.00", schema_extra={"json_schema_extra":{"example": "1000.00"}}, sa_column=Column(Numeric(20, 2)), )
 	
 	# Связь с валютой
 	currency_id: int = Field(foreign_key="currencies.id")
@@ -138,7 +143,8 @@ class Wallet(SQLModel, table=True):
 	
 	async def __admin_select2_repr__(self, request: Request):
 		return f"<div><strong>{self.name}</strong><br><small>Balance: {self.balance}</small></div>"
-	
+
+
 class Transaction(SQLModel, table=True):
 	__tablename__ = "transactions"
 	
@@ -167,7 +173,6 @@ class Transaction(SQLModel, table=True):
 		)
 	)
 	
-
 	# Self-referencing Foreign Key
 	related_transaction_id: Optional[int] = Field(default=None, foreign_key="transactions.id")
 	related_transaction: Optional["Transaction"] = Relationship(

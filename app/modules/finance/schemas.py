@@ -6,8 +6,7 @@ from uuid import UUID
 from pydantic import ConfigDict, model_validator, field_validator
 
 from app.modules.finance.models import WalletType, TransactionType
-from sqlmodel import SQLModel
-
+from sqlmodel import SQLModel, Field
 
 # ==========================================
 # Конфиг для корректной сериализации Decimal
@@ -15,7 +14,7 @@ from sqlmodel import SQLModel
 # Decimal → str в JSON, чтобы не терять копейки (float неточен для денег).
 # Фронтенд может использовать parseFloat() для графиков или отображать как есть.
 _money_model_config = ConfigDict(
-    json_encoders={Decimal: lambda v: str(v)}
+    json_encoders={Decimal: lambda v: v.to_eng_string()}
 )
 
 
@@ -82,8 +81,7 @@ class WalletRead(WalletBase):
     id: int
     balance: Decimal
     user_id: UUID
-    # Можно добавить поле currency_code, чтобы фронту не искать по ID
-    # currency_code: Optional[str] = None
+
     
 
 
@@ -91,7 +89,7 @@ class WalletRead(WalletBase):
 # --- TRANSACTION (Транзакции) ---
 
 class TransactionBase(SQLModel):
-    amount: Decimal = 0
+    amount: Decimal = Decimal("0.00")
     type: TransactionType
     category_id: Optional[int] = None
     merchant_name: Optional[str] = None
