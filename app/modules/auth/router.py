@@ -1,12 +1,12 @@
 # app/modules/auth/router.py
 from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi.security import OAuth2PasswordRequestForm
 from sqlmodel import Session
-from fastapi.security import OAuth2PasswordBearer
 
 from app.core.database import get_session  # Твоя функция подключения к БД
 from app.core.security import create_access_token
-from app.modules.auth.schemas import UserRead, UserCreate
 from app.modules.auth.schemas import Token, LoginRequest
+from app.modules.auth.schemas import UserRead, UserCreate
 from app.modules.auth.service import AuthService
 
 router = APIRouter()
@@ -52,4 +52,27 @@ def login(
 	# Если всё ок — генерируем токен
 	access_token = create_access_token(data={"sub": str(user.id)})
 	
+	return {"access_token": access_token, "token_type": "bearer"}
+
+
+@router.post("/access-token", response_model=Token)
+def login_for_access_token(
+		form_data: OAuth2PasswordRequestForm = Depends(),
+		service: AuthService = Depends(get_auth_service)
+):
+	"""
+	Эндпоинт специально для Swagger UI (и других OAuth2 клиентов).
+	Принимает username и password в виде формы (не JSON).
+	"""
+	# Swagger отправляет поле 'username', но мы знаем, что там лежит номер телефона
+	user = service.authenticate(form_data.username, form_data.password)
+	
+	if not user:
+		raise HTTPException(
+			status_code=status.HTTP_401_UNAUTHORIZED,
+			detail="Неверный номер телефона или пароль",
+			headers={"WWW-Authenticate": "Bearer"},
+		)
+	
+	access_token = create_access_token(data={"sub": str(user.id)})
 	return {"access_token": access_token, "token_type": "bearer"}

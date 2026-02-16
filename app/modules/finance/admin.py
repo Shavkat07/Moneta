@@ -17,6 +17,7 @@ from app.modules.finance.models import WalletType, TransactionType
 
 class CurrencyAdmin(ModelView):
 	fields = [
+		IntegerField("id", label="ID", exclude_from_create=True, exclude_from_edit=True),
 		StringField("char_code", label="ISO Code"),  # USD
 		StringField("code", label="Num Code"),  # 840
 		StringField("name", label="Name"),

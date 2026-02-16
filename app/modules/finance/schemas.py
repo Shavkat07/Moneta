@@ -3,7 +3,7 @@ from decimal import Decimal
 from typing import Optional, List
 from uuid import UUID
 
-from pydantic import ConfigDict, model_validator
+from pydantic import ConfigDict, model_validator, field_validator
 
 from app.modules.finance.models import WalletType, TransactionType
 from sqlmodel import SQLModel
@@ -36,7 +36,7 @@ class CurrencyRateResponse(SQLModel):
     rate: float
     date: date
     
-
+    
 
 # --- CATEGORY (Категории) ---
 class CategoryBase(SQLModel):
@@ -60,11 +60,15 @@ class CategoryRead(CategoryBase):
 class WalletBase(SQLModel):
     name: str
     type: WalletType = WalletType.CASH
-    currency_id: int
+    currency_code: str
 
 class WalletCreate(WalletBase):
     # При создании можно сразу задать начальный баланс
     balance: Decimal = Decimal("0.00")
+    
+    @field_validator("currency_code")
+    def upper_case_code(cls, v):
+        return v.upper()
 
 class WalletUpdate(SQLModel):
     name: Optional[str] = None
@@ -79,7 +83,7 @@ class WalletRead(WalletBase):
     balance: Decimal
     user_id: UUID
     # Можно добавить поле currency_code, чтобы фронту не искать по ID
-    currency: Optional[str] = None
+    # currency_code: Optional[str] = None
     
 
 

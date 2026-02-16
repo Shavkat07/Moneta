@@ -1,5 +1,5 @@
 import uuid
-from datetime import date as date_type, datetime
+from datetime import date as date_type, datetime, UTC
 from decimal import Decimal
 from enum import Enum
 from typing import Optional, List
@@ -159,13 +159,14 @@ class Transaction(SQLModel, table=True):
 	is_halal_suspect: bool = Field(default=False, description="Флаг подозрительной транзакции (Халяль)")
 	
 	created_at: datetime = Field(
-		default=None,
+		default_factory=lambda: datetime.now(UTC),  # Для Pydantic (Python-код)
 		sa_column=Column(
 			DateTime(timezone=True),
 			server_default=func.now(),
 			nullable=False,
 		)
 	)
+	
 
 	# Self-referencing Foreign Key
 	related_transaction_id: Optional[int] = Field(default=None, foreign_key="transactions.id")

@@ -11,8 +11,7 @@ from app.modules.auth.models import User
 from app.modules.auth.schemas import TokenPayload
 
 # Указываем FastAPI, где искать токен (в заголовке Authorization: Bearer ...)
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/login")
-
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/auth/access-token")
 
 def get_current_user(
 		token: str = Depends(oauth2_scheme),

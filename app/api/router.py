@@ -12,6 +12,6 @@ api_router = APIRouter()
 
 # Подключаем модули
 api_router.include_router(auth_router, prefix="/auth", tags=["Auth"])
-api_router.include_router(finance_router, prefix="/finance", tags=["Finance"])
+api_router.include_router(finance_router, prefix="/finance")
 api_router.include_router(analytics_router, prefix="/analytics", tags=["Analytics"])
-api_router.include_router(social_router, prefix="/social", tags=["Social"])
+api_router.include_router(social_router, prefix="/social")
