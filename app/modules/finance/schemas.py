@@ -153,3 +153,13 @@ class TransactionRead(TransactionBase):
     id: int
     wallet_id: int
     created_at: datetime
+
+
+class TransactionUpdate(SQLModel):
+    amount: Optional[Decimal] = None
+    type: Optional[TransactionType] = None
+    category_id: Optional[int] = None
+    merchant_name: Optional[str] = None
+    raw_sms_text: Optional[str] = None
+    is_halal_suspect: Optional[bool] = None
+    created_at: Optional[datetime] = None
