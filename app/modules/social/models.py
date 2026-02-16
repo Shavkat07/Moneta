@@ -64,7 +64,7 @@ class Debt(SQLModel, table=True):
 	
 	# Валюта (ОБЯЗАТЕЛЬНО)
 	currency_id: int = Field(foreign_key="currencies.id")
-	currency: "Currency" = Relationship(back_populates="debts") # Раскомментируй, если нужен доступ к obj.currency
+	currency: "Currency" = Relationship() # Раскомментируй, если нужен доступ к obj.currency
 	
 	# Сумма (Numeric для точности денег)
 	amount: Decimal = Field(sa_column=Column(Numeric(20, 2), nullable=False))
