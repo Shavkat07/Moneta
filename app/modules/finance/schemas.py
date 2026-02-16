@@ -50,16 +50,6 @@ class CbuCurrencyItem(SQLModel):
     # Pydantic конфиг для игнорирования лишних полей (Diff, CcyNm_UZ и т.д.)
     model_config = ConfigDict(extra="ignore", populate_by_name=True)
 
-
-# class CurrencySchema(SQLModel):
-#     id: int
-#     Code: str        # "840"
-#     Ccy: str         # "USD"
-#     CcyNm_RU: str    # "Доллар США"
-#     Nominal: str     # "1" (строкой приходит)
-#     Rate: str        # "12047.45" (строкой приходит)
-#     Date: str        # "12.12.2025"
-
 # 2. Схема для ОТДАЧИ данных на наш фронтенд
 class CurrencyRateResponse(SQLModel):
     currency: str    # USD
