@@ -12,76 +12,47 @@ class CurrencyService:
 	
 	def get_rate_to_base(self, currency_id: int, date: Optional[date_type] = None) -> Decimal:
 		"""
-		Возвращает стоимость 1 единицы валюты в базовой валюте (UZS).
-		Логика:
-		1. Если валюта UZS -> курс 1.
-		2. Иначе ищем последнюю запись в CurrencyRate.
-		
-		Args:
-			currency_id: ID валюты
-			date: Опциональная дата для получения исторического курса.
-			      Если не указана, возвращается последний доступный курс.
+		Возвращает курс 1 единицы валюты к UZS.
 		"""
+		# Оптимизация: Сразу джойним валюту, чтобы проверить код
 		currency = self.session.get(Currency, currency_id)
 		if not currency:
-			raise ValueError(f"Валюта с ID {currency_id} не найдена")
+			raise ValueError(f"Currency ID {currency_id} not found")
 		
-		# Если это базовый UZS, его курс всегда 1
 		if currency.char_code == "UZS":
 			return Decimal("1.00")
 		
-		# Строим запрос для поиска курса
-		statement = (
-			select(CurrencyRate)
-			.where(CurrencyRate.currency_id == currency_id)
-		)
+		query = select(CurrencyRate.rate).where(CurrencyRate.currency_id == currency_id)
 		
-		# Если указана дата, ищем курс на эту дату или ближайший предыдущий
-		if date is not None:
-			statement = statement.where(CurrencyRate.date <= date)
+		if date:
+			query = query.where(CurrencyRate.date <= date)
 		
-		# Сортируем по дате в обратном порядке и берем первый
-		statement = statement.order_by(desc(CurrencyRate.date))
-		rate_entry = self.session.exec(statement).first()
+		# Берем самый свежий курс (на дату или последний вообще)
+		query = query.order_by(CurrencyRate.date.desc())
 		
-		if not rate_entry:
-			if date is not None:
-				raise ValueError(
-					f"Не найден курс для валюты {currency.char_code} на дату {date} или ранее. "
-					f"Сначала обновите курсы."
-				)
-			else:
-				raise ValueError(f"Не найден курс для валюты {currency.char_code}. Сначала обновите курсы.")
+		rate = self.session.exec(query).first()
 		
-		return rate_entry.rate
+		if rate is None:
+			raise ValueError(f"No rate found for {currency.char_code}")
+		
+		return rate  # Это уже Decimal и уже за 1 единицу
 	
 	def convert(
-		self, 
-		amount: Decimal, 
-		from_currency_id: int, 
-		to_currency_id: int,
-		date: Optional[date_type] = None
+			self,
+			amount: Decimal,
+			from_currency_id: int,
+			to_currency_id: int,
+			date: Optional[date_type] = None
 	) -> Decimal:
-		"""
-		Конвертирует сумму из одной валюты в другую.
-		Формула: Amount * (Rate_From / Rate_To)
-		
-		Args:
-			amount: Сумма для конвертации
-			from_currency_id: ID исходной валюты
-			to_currency_id: ID целевой валюты
-			date: Опциональная дата для использования исторического курса.
-			      Если не указана, используется последний доступный курс.
-		"""
 		if from_currency_id == to_currency_id:
 			return amount
 		
-		rate_from = self.get_rate_to_base(from_currency_id, date=date)
-		rate_to = self.get_rate_to_base(to_currency_id, date=date)
+		rate_from = self.get_rate_to_base(from_currency_id, date)
+		rate_to = self.get_rate_to_base(to_currency_id, date)
 		
-		# Считаем через кросс-курс (через UZS)
-		# Пример: 100 USD -> EUR
-		# 100 * (12500 / 13500) = 92.59 EUR
-		converted_amount = amount * (rate_from / rate_to)
+		# Формула: (Сумма * Курс_Из) / Курс_В
+		# Т.к. все курсы к UZS, это работает идеально.
+		converted = (amount * rate_from) / rate_to
 		
-		return round(converted_amount, 2)
+		# Округляем до 2 знаков только в самом конце
+		return converted.quantize(Decimal("1.00"))

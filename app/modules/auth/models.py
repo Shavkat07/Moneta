@@ -1,5 +1,5 @@
 import uuid
-from datetime import datetime
+from datetime import datetime, UTC
 from enum import Enum
 from typing import Optional, List, TYPE_CHECKING
 
@@ -25,8 +25,6 @@ class UserRole(str, Enum):
 	ADMIN = "admin"
 
 
-# --- BASE (Родитель) ---
-# Поля, общие для всех.
 class UserBase(SQLModel):
 	phone_number: str = Field(index=True, unique=True, max_length=15)
 	full_name: Optional[str] = Field(default=None, max_length=100)
@@ -34,8 +32,6 @@ class UserBase(SQLModel):
 	email: Optional[str] = Field(default=None)
 
 
-# --- TABLE (Для Базы Данных) ---
-# Добавляем ID, хеш пароля и служебные поля.
 class User(UserBase, table=True):
 	__tablename__ = "users"
 	
@@ -47,18 +43,20 @@ class User(UserBase, table=True):
 	role: UserRole = Field(default=UserRole.USER)
 	
 	created_at: datetime = Field(
+		default_factory=lambda: datetime.now(UTC),  # Для Pydantic (Python-код)
 		sa_column=Column(
 			DateTime(timezone=True),
-			server_default=func.now(),
+			server_default=func.now(),  # Для SQL (миграции/БД)
 			nullable=False,
 		)
 	)
 	
 	updated_at: datetime = Field(
+		default_factory=lambda: datetime.now(UTC),  # Для Pydantic
 		sa_column=Column(
 			DateTime(timezone=True),
-			server_default=func.now(),
-			onupdate=func.now(),
+			server_default=func.now(),  # Начальное значение в БД
+			onupdate=func.now(),  # Авто-обновление в БД
 			nullable=False,
 		)
 	)

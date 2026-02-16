@@ -3,11 +3,10 @@ from decimal import Decimal
 from typing import Optional, List
 from uuid import UUID
 
-from pydantic import ConfigDict, model_validator
+from pydantic import ConfigDict, model_validator, field_validator
 
 from app.modules.finance.models import WalletType, TransactionType
-from sqlmodel import SQLModel
-
+from sqlmodel import SQLModel, Field
 
 # ==========================================
 # Конфиг для корректной сериализации Decimal
@@ -15,20 +14,51 @@ from sqlmodel import SQLModel
 # Decimal → str в JSON, чтобы не терять копейки (float неточен для денег).
 # Фронтенд может использовать parseFloat() для графиков или отображать как есть.
 _money_model_config = ConfigDict(
-    json_encoders={Decimal: lambda v: str(v)}
+    json_encoders={Decimal: lambda v: v.to_eng_string()}
 )
 
 
 # 1. Схема для ПАРСИНГА данных с API ЦБ (сырые данные)
 # Поля названы так, как приходят от cbu.uz
-class CurrencySchema(SQLModel):
+class CbuCurrencyItem(SQLModel):
     id: int
-    Code: str        # "840"
-    Ccy: str         # "USD"
-    CcyNm_RU: str    # "Доллар США"
-    Nominal: str     # "1" (строкой приходит)
-    Rate: str        # "12047.45" (строкой приходит)
-    Date: str        # "12.12.2025"
+    # Используем alias, чтобы мапить ключи JSON (Code) в поля Python (code)
+    code: str = Field(alias="Code")  # "840"
+    char_code: str = Field(alias="Ccy")  # "USD"
+    name_ru: str = Field(alias="CcyNm_RU")  # "Доллар США"
+    
+    # Принимаем строками, валидатор переделает в числа
+    nominal_raw: str = Field(alias="Nominal")
+    rate_raw: str = Field(alias="Rate")
+    date_raw: str = Field(alias="Date")
+    
+    @property
+    def nominal(self) -> int:
+        return int(self.nominal_raw)
+    
+    @property
+    def rate(self) -> Decimal:
+        # Заменяем запятую на точку, если вдруг ЦБ сменит формат
+        clean_rate = self.rate_raw.replace(",", ".")
+        return Decimal(clean_rate)
+    
+    @property
+    def parsed_date(self) -> date:
+        from datetime import datetime
+        return datetime.strptime(self.date_raw, "%d.%m.%Y").date()
+    
+    # Pydantic конфиг для игнорирования лишних полей (Diff, CcyNm_UZ и т.д.)
+    model_config = ConfigDict(extra="ignore", populate_by_name=True)
+
+
+# class CurrencySchema(SQLModel):
+#     id: int
+#     Code: str        # "840"
+#     Ccy: str         # "USD"
+#     CcyNm_RU: str    # "Доллар США"
+#     Nominal: str     # "1" (строкой приходит)
+#     Rate: str        # "12047.45" (строкой приходит)
+#     Date: str        # "12.12.2025"
 
 # 2. Схема для ОТДАЧИ данных на наш фронтенд
 class CurrencyRateResponse(SQLModel):
@@ -36,7 +66,10 @@ class CurrencyRateResponse(SQLModel):
     rate: float
     date: date
     
-
+    model_config = ConfigDict(
+        json_encoders={Decimal: lambda v: v.to_eng_string()}
+    )
+    
 
 # --- CATEGORY (Категории) ---
 class CategoryBase(SQLModel):
@@ -60,11 +93,15 @@ class CategoryRead(CategoryBase):
 class WalletBase(SQLModel):
     name: str
     type: WalletType = WalletType.CASH
-    currency_id: int
+    currency_code: str
 
 class WalletCreate(WalletBase):
     # При создании можно сразу задать начальный баланс
     balance: Decimal = Decimal("0.00")
+    
+    @field_validator("currency_code")
+    def upper_case_code(cls, v):
+        return v.upper()
 
 class WalletUpdate(SQLModel):
     name: Optional[str] = None
@@ -76,10 +113,9 @@ class WalletRead(WalletBase):
     model_config = _money_model_config
 
     id: int
-    balance: Decimal
+    balance: Decimal = Decimal("0.00")
     user_id: UUID
-    # Можно добавить поле currency_code, чтобы фронту не искать по ID
-    currency: Optional[str] = None
+
     
 
 
@@ -87,7 +123,7 @@ class WalletRead(WalletBase):
 # --- TRANSACTION (Транзакции) ---
 
 class TransactionBase(SQLModel):
-    amount: Decimal = 0
+    amount: Decimal = Decimal("0.00")
     type: TransactionType
     category_id: Optional[int] = None
     merchant_name: Optional[str] = None

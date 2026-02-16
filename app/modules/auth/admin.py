@@ -9,7 +9,8 @@ from starlette_admin.fields import (
 	PhoneField,
 	DateTimeField,
 	HasMany,
-	FileField
+	FileField,
+	EmailField
 )
 from starlette_admin.helpers import not_none
 from starlette_admin.exceptions import FormValidationError
@@ -25,7 +26,7 @@ class UserAdmin(ModelView):
 		
 		PhoneField("phone_number", label="Phone Number", placeholder="998901234567"),
 		StringField("full_name", label="Full Name"),
-		
+		EmailField("email", label="Email"),
 		# 1. Поле для СОЗДАНИЯ
 		PasswordField(
 			"password_create",

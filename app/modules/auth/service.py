@@ -1,6 +1,6 @@
 # app/modules/auth/service.py
 from sqlmodel import Session, select
-from fastapi import HTTPException, status
+from fastapi import HTTPException
 from app.modules.auth.models import User
 from app.core.security import get_password_hash, verify_password
 from app.modules.auth.schemas import UserCreate
@@ -26,7 +26,7 @@ class AuthService:
 		
 		# 3. Создаем объект User (но пароль подменяем на хеш)
 		# exclude={"password"} убирает сырой пароль из данных
-		db_user = User.from_orm(user_in, update={"hashed_password": hashed_pw})
+		db_user = User.model_validate(user_in, update={"hashed_password": hashed_pw})
 		
 		# 4. Сохраняем
 		self.session.add(db_user)
