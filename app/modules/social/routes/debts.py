@@ -19,7 +19,7 @@ from app.modules.social.schemas import (
 
 router = APIRouter()
 
-@router.post("/debts", response_model=DebtRead, status_code=201, summary="Записать долг")
+@router.post("", response_model=DebtRead, status_code=201, summary="Записать долг")
 def create_debt(
 		debt_in: DebtCreate,
 		session: Session = Depends(get_session),
@@ -46,7 +46,7 @@ def create_debt(
 	return debt
 
 
-@router.get("/debts", response_model=List[DebtRead], summary="Список долгов")
+@router.get("", response_model=List[DebtRead], summary="Список долгов")
 def get_debts(
 		debtor_id: Optional[int] = None,
 		status: Optional[DebtStatus] = None,
@@ -76,7 +76,7 @@ def get_debts(
 	return debts
 
 
-@router.get("/debts/{debt_id}", response_model=DebtRead)
+@router.get("/{debt_id}", response_model=DebtRead)
 def get_debt_detail(
 		debt_id: int,
 		session: Session = Depends(get_session),
@@ -88,7 +88,7 @@ def get_debt_detail(
 	return debt
 
 
-@router.patch("/debts/{debt_id}", response_model=DebtRead, summary="Обновить долг / Погасить часть")
+@router.patch("/{debt_id}", response_model=DebtRead, summary="Обновить долг / Погасить часть")
 def update_debt(
 		debt_id: int,
 		debt_in: DebtUpdate,
@@ -123,7 +123,7 @@ def update_debt(
 	return debt
 
 
-@router.delete("/debts/{debt_id}", status_code=204, summary="Удалить запись")
+@router.delete("/{debt_id}", status_code=204, summary="Удалить запись")
 def delete_debt(
 		debt_id: int,
 		session: Session = Depends(get_session),

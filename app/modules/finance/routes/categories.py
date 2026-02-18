@@ -19,7 +19,7 @@ from app.modules.finance.schemas import (
 router = APIRouter()
 
 
-@router.post("/categories", response_model=CategoryRead, summary="Создать категорию")
+@router.post("", response_model=CategoryRead, summary="Создать категорию")
 def create_category(
 		category_in: CategoryCreate,
 		session: Session = Depends(get_session),
@@ -40,7 +40,7 @@ def create_category(
 	return category
 
 
-@router.get("/categories", response_model=List[CategoryRead], summary="Список всех категорий")
+@router.get("", response_model=List[CategoryRead], summary="Список всех категорий")
 def get_categories(
 		session: Session = Depends(get_session),
 		current_user: User = Depends(get_current_user)

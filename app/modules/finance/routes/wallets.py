@@ -15,7 +15,7 @@ from app.modules.finance.schemas import WalletCreate, WalletRead
 router = APIRouter()
 
 
-@router.post("/wallets", response_model=WalletRead, status_code=201, summary="Создать кошелек")
+@router.post("", response_model=WalletRead, status_code=201, summary="Создать кошелек")
 def create_wallet(
 		wallet_in: WalletCreate,
 		session: Session = Depends(get_session),
@@ -48,7 +48,7 @@ def create_wallet(
 	)
 
 
-@router.get("/wallets", response_model=List[WalletRead], summary="Мои кошельки")
+@router.get("/all", response_model=List[WalletRead], summary="Мои кошельки")
 def get_my_wallets(
 		session: Session = Depends(get_session),
 		current_user: User = Depends(get_current_user)
@@ -74,7 +74,7 @@ def get_my_wallets(
 	return response
 
 
-@router.get("/wallets/{wallet_id}", response_model=WalletRead)
+@router.get("/{wallet_id}", response_model=WalletRead)
 def get_wallet_detail(
 		wallet_id: int,
 		session: Session = Depends(get_session),
@@ -95,7 +95,7 @@ def get_wallet_detail(
 	)
 
 
-@router.delete("wallets/{wallet_id}", summary="Delete wallet")
+@router.delete("/{wallet_id}", summary="Delete wallet")
 def delete_wallet(wallet_id: int,
                   session: Session = Depends(get_session),
                   current_user: User = Depends(get_current_user)
