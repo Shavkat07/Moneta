@@ -2,7 +2,9 @@
 # app/core/config.py
 from functools import lru_cache
 from pathlib import Path
+from typing import Optional
 
+from pydantic import model_validator
 from pydantic_settings import BaseSettings
 
 
@@ -10,11 +12,11 @@ class Settings(BaseSettings):
 	PROJECT_NAME: str = "Moneta API"
 	
 	# --- POSTGRES ---
-	POSTGRES_USER: str
-	POSTGRES_PASS: str
-	POSTGRES_PORT: int
-	POSTGRES_NAME: str
-	POSTGRES_HOST: str
+	POSTGRES_USER: Optional[str] = None
+	POSTGRES_PASS: Optional[str] = None
+	POSTGRES_PORT: Optional[int] = None
+	POSTGRES_NAME: Optional[str] = None
+	POSTGRES_HOST: Optional[str] = None
 	
 	# --- DATABASE ---
 	DATABASE_URL: str | None = None
@@ -33,14 +35,28 @@ class Settings(BaseSettings):
 		env_file = ".env"
 		case_sensitive = True
 	
-	def model_post_init(self, __context):
-		self.DATABASE_URL = (
-			f"postgresql://{self.POSTGRES_USER}:"
-			f"{self.POSTGRES_PASS}@"
-			f"{self.POSTGRES_HOST}:"
-			f"{self.POSTGRES_PORT}/"
-			f"{self.POSTGRES_NAME}"
-		)
+	@model_validator(mode='after')
+	def assemble_db_connection(self) -> 'Settings':
+		# Если DATABASE_URL уже пришел от Heroku, ничего не делаем
+		if self.DATABASE_URL:
+			# Heroku иногда присылает 'postgres://', SQLAlchemy требует 'postgresql://'
+			if self.DATABASE_URL.startswith("postgres://"):
+				self.DATABASE_URL = self.DATABASE_URL.replace("postgres://", "postgresql://", 1)
+			return self
+		
+		# Если целой строки нет, собираем из компонентов
+		if all([self.POSTGRES_USER, self.POSTGRES_PASS, self.POSTGRES_HOST, self.POSTGRES_PORT, self.POSTGRES_NAME]):
+			self.DATABASE_URL = (
+				f"postgresql://{self.POSTGRES_USER}:"
+				f"{self.POSTGRES_PASS}@"
+				f"{self.POSTGRES_HOST}:"
+				f"{self.POSTGRES_PORT}/"
+				f"{self.POSTGRES_NAME}"
+			)
+		else:
+			raise ValueError("Необходимо указать либо DATABASE_URL, либо все компоненты POSTGRES_*")
+		
+		return self
 
 
 @lru_cache

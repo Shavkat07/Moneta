@@ -20,7 +20,7 @@ router = APIRouter()
 # 1. 👥 DEBTORS (Контакты / Должники)
 # ==========================================
 
-@router.post("/debtors", response_model=DebtorRead, status_code=201, summary="Создать контакт")
+@router.post("", response_model=DebtorRead, status_code=201, summary="Создать контакт")
 def create_debtor(
 		debtor_in: DebtorCreate,
 		session: Session = Depends(get_session),
@@ -49,7 +49,7 @@ def create_debtor(
 	return debtor
 
 
-@router.get("/debtors", response_model=List[DebtorRead], summary="Список контактов")
+@router.get("", response_model=List[DebtorRead], summary="Список контактов")
 def get_debtors(
 		session: Session = Depends(get_session),
 		current_user: User = Depends(get_current_user)
