@@ -5,9 +5,12 @@ from sqlmodel import Session
 
 from app.core.database import get_session  # Твоя функция подключения к БД
 from app.core.security import create_access_token
+from app.modules.auth.models import UserRole, UserLanguage
 from app.modules.auth.schemas import Token, LoginRequest
 from app.modules.auth.schemas import UserRead, UserCreate
 from app.modules.auth.service import AuthService
+from app.modules.finance.models import WalletType, TransactionType
+from app.modules.social.models import DebtType, DebtStatus
 
 router = APIRouter()
 
@@ -76,3 +79,15 @@ def login_for_access_token(
 	
 	access_token = create_access_token(data={"sub": str(user.id)})
 	return {"access_token": access_token, "token_type": "bearer"}
+
+
+@router.get("/reference/constants")
+def get_constants():
+	return {
+		"user_types": [e.value for e in UserRole],
+		"user_language_types": [e.value for e in UserLanguage],
+		"wallet_types": [e.value for e in WalletType],
+		"transaction_types": [e.value for e in TransactionType],
+		"debt_types": [e.value for e in DebtType],
+		"debt_status_types": [e.value for e in DebtStatus],
+	}
