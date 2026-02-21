@@ -280,14 +280,18 @@ class TransactionService:
 	def _build_transaction_model(self, wallet_id: int, amount: Decimal, tx_type: TransactionType,
 	                             data: TransactionCreate, merchant_name: str = None,
 	                             related_id: int = None) -> Transaction:
-		"""Фабрика для создания объекта модели (убирает дублирование кода)."""
+		"""
+		Фабрика для создания объекта модели (убирает дублирование кода).
+		"""
 		return Transaction(
 			wallet_id=wallet_id,
 			amount=amount,
 			type=tx_type,
 			category_id=data.category_id if data.category_id != 0 else None,
-			merchant_name=merchant_name or data.merchant_name or "Без названия",
-			date=data.date or datetime.now(timezone.utc),  # Если передана дата операции
+			merchant_name= merchant_name or data.merchant_name or "Unknown",
+			raw_sms_text=data.raw_sms_text if data.raw_sms_text != "" else None,
+			# date=data.created_at or datetime.now(timezone.utc),  # Если передана дата операции
+			is_halal_suspect=data.is_halal_suspect if data.is_halal_suspect != "" else None,
 			created_at=datetime.now(timezone.utc),
 			related_transaction_id=related_id
 		)

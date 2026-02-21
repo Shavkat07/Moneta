@@ -59,7 +59,7 @@ class CurrencyRate(SQLModel, table=True):
 	
 	# ВАЖНО: Используем Decimal и Numeric(20, 4)
 	# Это позволяет хранить курсы типа 12750.45 или 0.0045 без потери точности
-	rate: Decimal = Field(sa_column=Column(Numeric(20, 6)))
+	rate: Decimal = Field(default=0, decimal_places=6, max_digits=20)
 	
 	# Дата курса
 	date: date_type = Field(index=True)
@@ -122,7 +122,7 @@ class Wallet(SQLModel, table=True):
 	user_id: uuid.UUID = Field(foreign_key="users.id", index=True)
 	
 	name: str = Field(max_length=100)
-	balance: Decimal = Field(default="0.00", schema_extra={"json_schema_extra":{"example": "1000.00"}}, sa_column=Column(Numeric(20, 2)), )
+	balance: Decimal = Field(default=0, decimal_places=2, max_digits=20)
 	
 	# Связь с валютой
 	currency_id: int = Field(foreign_key="currencies.id")
@@ -153,7 +153,7 @@ class Transaction(SQLModel, table=True):
 	wallet_id: int = Field(foreign_key="wallets.id")
 	wallet: "Wallet" = Relationship(back_populates="transactions")
 	
-	amount: Decimal = Field(sa_column=Column(Numeric(20, 2)))
+	amount: Decimal = Field(default=0, decimal_places=2, max_digits=20)
 	type: TransactionType = Field(index=True)
 	
 	category_id: Optional[int] = Field(default=None, foreign_key="categories.id", nullable=True)

@@ -1,3 +1,4 @@
+from decimal import Decimal
 from typing import List
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -13,6 +14,53 @@ from app.modules.finance.schemas import WalletCreate, WalletRead
 # 3. 👛 WALLETS (Кошельки)
 # ==========================================
 router = APIRouter()
+
+
+@router.get("/all", response_model=List[WalletRead], summary="Мои кошельки")
+def get_my_wallets(
+		session: Session = Depends(get_session),
+		current_user: User = Depends(get_current_user)
+):
+	# Показываем только кошельки текущего пользователя
+	statement = select(Wallet).where(Wallet.user_id == current_user.id)
+	wallets = session.exec(statement).all()
+	
+	response = []
+	for w in wallets:
+		# Для каждого кошелька берем код валюты через связь currency_rel
+		# w.currency_rel.char_code автоматически сделает запрос в БД, если данные не подгружены
+		code = w.currency_rel.char_code if w.currency_rel else "UNKNOWN"
+		
+		response.append(WalletRead(
+			id=w.id,
+			name=w.name,
+			type=w.type,
+			balance=Decimal(w.balance),
+			user_id=w.user_id,
+			currency_code=code  # <--- Заполняем поле
+		))
+	return response
+
+
+@router.get("/{wallet_id}", response_model=WalletRead)
+def get_wallet_detail(
+		wallet_id: int,
+		session: Session = Depends(get_session),
+		current_user: User = Depends(get_current_user)
+):
+	wallet = session.get(Wallet, wallet_id)
+	if not wallet or wallet.user_id != current_user.id:
+		raise HTTPException(status_code=404, detail="Кошелек не найден")
+	
+	code = wallet.currency_rel.char_code if wallet.currency_rel else "UNKNOWN"
+	return WalletRead(
+		id=wallet.id,
+		name=wallet.name,
+		type=wallet.type,
+		balance=wallet.balance,
+		user_id=wallet.user_id,
+		currency_code=code
+	)
 
 
 @router.post("", response_model=WalletRead, status_code=201, summary="Создать кошелек")
@@ -45,53 +93,6 @@ def create_wallet(
 		balance=wallet.balance,
 		user_id=wallet.user_id,
 		currency_code=currency.char_code  # Берем код из найденной валюты
-	)
-
-
-@router.get("/all", response_model=List[WalletRead], summary="Мои кошельки")
-def get_my_wallets(
-		session: Session = Depends(get_session),
-		current_user: User = Depends(get_current_user)
-):
-	# Показываем только кошельки текущего пользователя
-	statement = select(Wallet).where(Wallet.user_id == current_user.id)
-	wallets = session.exec(statement).all()
-	
-	response = []
-	for w in wallets:
-		# Для каждого кошелька берем код валюты через связь currency_rel
-		# w.currency_rel.char_code автоматически сделает запрос в БД, если данные не подгружены
-		code = w.currency_rel.char_code if w.currency_rel else "UNKNOWN"
-		
-		response.append(WalletRead(
-			id=w.id,
-			name=w.name,
-			type=w.type,
-			balance=w.balance,
-			user_id=w.user_id,
-			currency_code=code  # <--- Заполняем поле
-		))
-	return response
-
-
-@router.get("/{wallet_id}", response_model=WalletRead)
-def get_wallet_detail(
-		wallet_id: int,
-		session: Session = Depends(get_session),
-		current_user: User = Depends(get_current_user)
-):
-	wallet = session.get(Wallet, wallet_id)
-	if not wallet or wallet.user_id != current_user.id:
-		raise HTTPException(status_code=404, detail="Кошелек не найден")
-	
-	code = wallet.currency_rel.char_code if wallet.currency_rel else "UNKNOWN"
-	return WalletRead(
-		id=wallet.id,
-		name=wallet.name,
-		type=wallet.type,
-		balance=wallet.balance,
-		user_id=wallet.user_id,
-		currency_code=code
 	)
 
 
