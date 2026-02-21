@@ -5,7 +5,7 @@ from enum import Enum
 from typing import Optional, List
 
 from pydantic import ConfigDict
-from sqlalchemy import Column, Numeric, DateTime, func  # Для точной настройки поля в БД
+from sqlalchemy import Column, DateTime, func  # Для точной настройки поля в БД
 from sqlmodel import SQLModel, Field, Relationship
 from starlette.requests import Request
 
@@ -24,6 +24,11 @@ class TransactionType(str, Enum):
 	INCOME = "income"
 	EXPENSE = "expense"
 	TRANSFER = "transfer"  # Полезно, если будет перевод между кошельками
+
+
+class CategoryType(str, Enum):
+	INCOME = "income"
+	EXPENSE = "expense"
 
 
 # --- Справочник валют ---
@@ -56,15 +61,8 @@ class CurrencyRate(SQLModel, table=True):
 	
 	id: Optional[int] = Field(default=None, primary_key=True)
 	currency_id: int = Field(foreign_key="currencies.id")
-	
-	# ВАЖНО: Используем Decimal и Numeric(20, 4)
-	# Это позволяет хранить курсы типа 12750.45 или 0.0045 без потери точности
 	rate: Decimal = Field(default=0, decimal_places=6, max_digits=20)
-	
-	# Дата курса
 	date: date_type = Field(index=True)
-	
-	# Обратная связь
 	currency: "Currency" = Relationship(back_populates="rates")
 	
 	def __str__(self):
@@ -82,10 +80,11 @@ class Category(SQLModel, table=True):
 	
 	id: Optional[int] = Field(default=None, primary_key=True)
 	name: str = Field(max_length=100)
+	type: CategoryType = Field(default=CategoryType.EXPENSE)
 	icon_slug: Optional[str] = Field(default=None, description="Название иконки для фронта")
 	
-	# Поле внешнего ключа
 	parent_id: Optional[int] = Field(default=None, foreign_key="categories.id")
+	user_id: Optional[uuid.UUID] = Field(default=None, foreign_key="users.id", nullable=True)
 	
 	# 1. Связь "Родитель" (Many-to-One)
 	# Именно здесь нужен remote_side, указывающий на ID этой же таблицы

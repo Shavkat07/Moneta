@@ -12,7 +12,7 @@ from starlette_admin.fields import (
 	BooleanField,
 	TextAreaField
 )
-from app.modules.finance.models import WalletType, TransactionType
+from app.modules.finance.models import WalletType, TransactionType, CategoryType
 
 
 class CurrencyAdmin(ModelView):
@@ -41,8 +41,8 @@ class CategoryAdmin(ModelView):
 		StringField("id", label="ID", exclude_from_create=True, exclude_from_edit=True),
 		StringField("name", label="Name"),
 		StringField("icon_slug", label="Icon Slug"),
-		
-		# Самоссылающаяся связь (Родительская категория)
+		EnumField("type", label="Type", enum=CategoryType),
+		HasOne("user", label="Owner", identity="user"),
 		HasOne("parent", label="Parent Category", identity="category"),
 		HasMany("children", label="Subcategories", identity="category"),
 	]
