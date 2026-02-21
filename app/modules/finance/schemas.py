@@ -5,7 +5,7 @@ from uuid import UUID
 
 from pydantic import ConfigDict, model_validator, field_validator
 
-from app.modules.finance.models import WalletType, TransactionType
+from app.modules.finance.models import WalletType, TransactionType, CategoryType
 from sqlmodel import SQLModel, Field
 
 # ==========================================
@@ -64,17 +64,24 @@ class CurrencyRateResponse(SQLModel):
 # --- CATEGORY (Категории) ---
 class CategoryBase(SQLModel):
     name: str
+    type: CategoryType = CategoryType.EXPENSE
     icon_slug: Optional[str] = None
     parent_id: Optional[int] = None
-
+    
 class CategoryCreate(CategoryBase):
     pass
 
+class CategoryUpdate(SQLModel):
+    name: Optional[str] = None
+    type: Optional[CategoryType] = None
+    icon_slug: Optional[str] = None
+    parent_id: Optional[int] = None
+    
 class CategoryRead(CategoryBase):
     id: int
+    user_id: Optional[UUID]
     children: List["CategoryRead"] = []
-    # Можно добавить поле children, если будем строить дерево
-    
+
 
 
 

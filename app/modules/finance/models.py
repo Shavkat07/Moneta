@@ -84,20 +84,15 @@ class Category(SQLModel, table=True):
 	icon_slug: Optional[str] = Field(default=None, description="Название иконки для фронта")
 	
 	parent_id: Optional[int] = Field(default=None, foreign_key="categories.id")
-	user_id: Optional[uuid.UUID] = Field(default=None, foreign_key="users.id", nullable=True)
-	
-	# 1. Связь "Родитель" (Many-to-One)
-	# Именно здесь нужен remote_side, указывающий на ID этой же таблицы
 	parent: Optional["Category"] = Relationship(
 		back_populates="children",
 		sa_relationship_kwargs={"remote_side": "Category.id"}
 	)
 	
-	# 2. Связь "Дети" (One-to-Many)
-	# Здесь просто указываем обратную связь
+	user_id: Optional[uuid.UUID] = Field(default=None, foreign_key="users.id", nullable=True)
+	user: Optional["User"] = Relationship(back_populates="categories")
+
 	children: List["Category"] = Relationship(back_populates="parent")
-	
-	# Связь с транзакциями
 	transactions: List["Transaction"] = Relationship(back_populates="category")
 	
 	def __str__(self):
@@ -116,14 +111,13 @@ class Wallet(SQLModel, table=True):
 	model_config = ConfigDict(json_encoders={Decimal: str})
 	
 	id: Optional[int] = Field(default=None, primary_key=True)
-	
-	# Связь с User (из модуля Auth). Используем UUID
+
 	user_id: uuid.UUID = Field(foreign_key="users.id", index=True)
+	user: Optional[User] = Relationship(back_populates="wallets")
 	
 	name: str = Field(max_length=100)
 	balance: Decimal = Field(default=0, decimal_places=2, max_digits=20)
 	
-	# Связь с валютой
 	currency_id: int = Field(foreign_key="currencies.id")
 	currency_rel: "Currency" = Relationship(back_populates="wallets")
 	
@@ -132,7 +126,7 @@ class Wallet(SQLModel, table=True):
 	# Связи
 	transactions: List["Transaction"] = Relationship(back_populates="wallet")
 	
-	user: Optional[User] = Relationship(back_populates="wallets")
+	
 	
 	def __str__(self):
 		return f"{self.name} ({self.balance})"

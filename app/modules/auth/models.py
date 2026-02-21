@@ -62,7 +62,7 @@ class User(UserBase, table=True):
 	)
 	
 	wallets: List["Wallet"] = Relationship(back_populates="user")
-	
+	categories: List["Category"] = Relationship(back_populates="user")
 	def __str__(self) -> str:
 		return f"{self.full_name} +{self.phone_number}"
 	
