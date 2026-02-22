@@ -56,7 +56,7 @@ def test_transfer_integrity(session: Session, initial_data):
         amount=amount,
         type=TransactionType.TRANSFER,
         target_wallet_id=wallet2.id,
-        merchant_name="Transfer Test"
+        description="Transfer Test"
     )
     
     # Call the actual router function

@@ -123,9 +123,9 @@ class TransactionBase(SQLModel):
     amount: Decimal = Decimal("0.00")
     type: TransactionType
     category_id: Optional[int] = None
-    merchant_name: Optional[str] = None
+    description: Optional[str] = None
     raw_sms_text: Optional[str] = None
-    is_halal_suspect: bool = True
+
 
 class TransactionCreate(TransactionBase):
     wallet_id: int
@@ -156,7 +156,6 @@ class TransactionUpdate(SQLModel):
     amount: Optional[Decimal] = None
     type: Optional[TransactionType] = None
     category_id: Optional[int] = None
-    merchant_name: Optional[str] = None
+    description: Optional[str] = None
     raw_sms_text: Optional[str] = None
-    is_halal_suspect: Optional[bool] = None
     created_at: Optional[datetime] = None

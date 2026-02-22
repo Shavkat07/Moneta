@@ -74,13 +74,12 @@ class TransactionAdmin(ModelView):
 		HasOne("wallet", label="Wallet", identity="wallet"),
 		HasOne("category", label="Category", identity="category"),
 		
-		StringField("merchant_name", label="Merchant"),
+		StringField("description", label="Merchant"),
 		TextAreaField("raw_sms_text", label="SMS Raw Text"),
-		BooleanField("is_halal_suspect", label="Halal Check"),
 	]
 	
 	# Мощный фильтр для поиска
-	searchable_fields = ["merchant_name", "wallet.name", "amount"]
+	searchable_fields = ["wallet.name", "amount"]
 	sortable_fields = ["created_at", "amount"]
 	
 	exclude_fields_from_create = ["created_at"]

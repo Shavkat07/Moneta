@@ -87,7 +87,7 @@ class TransactionService:
 						amount=amount,
 						tx_type=TransactionType.EXPENSE,
 						data=transaction_in,
-						merchant_name=f"Перевод на {target_wallet.name}"
+						description=f"Перевод на {target_wallet.name}"
 					)
 					self.session.add(expense_tx)
 					self.session.flush()
@@ -98,7 +98,7 @@ class TransactionService:
 						amount=converted_amount,
 						tx_type=TransactionType.INCOME,
 						data=transaction_in,  # Копируем категорию/дату
-						merchant_name=f"Перевод от {source_wallet.name}",
+						description=f"Перевод от {source_wallet.name}",
 						related_id=expense_tx.id
 					)
 					# Очищаем категорию для входящего перевода, чтобы не дублировать статистику
@@ -278,7 +278,7 @@ class TransactionService:
 		self.session.add(wallet)
 	
 	def _build_transaction_model(self, wallet_id: int, amount: Decimal, tx_type: TransactionType,
-	                             data: TransactionCreate, merchant_name: str = None,
+	                             data: TransactionCreate, description: str = None,
 	                             related_id: int = None) -> Transaction:
 		"""
 		Фабрика для создания объекта модели (убирает дублирование кода).
@@ -288,10 +288,9 @@ class TransactionService:
 			amount=amount,
 			type=tx_type,
 			category_id=data.category_id if data.category_id != 0 else None,
-			merchant_name= merchant_name or data.merchant_name or "Unknown",
+			description= description or data.description or "",
 			raw_sms_text=data.raw_sms_text if data.raw_sms_text != "" else None,
 			# date=data.created_at or datetime.now(timezone.utc),  # Если передана дата операции
-			is_halal_suspect=data.is_halal_suspect if data.is_halal_suspect != "" else None,
 			created_at=datetime.now(timezone.utc),
 			related_transaction_id=related_id
 		)

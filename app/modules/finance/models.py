@@ -152,10 +152,9 @@ class Transaction(SQLModel, table=True):
 	category_id: Optional[int] = Field(default=None, foreign_key="categories.id", nullable=True)
 	category: Optional["Category"] = Relationship(back_populates="transactions")
 	
-	merchant_name: Optional[str] = Field(default=None, max_length=150)
+	description: Optional[str] = Field(default=None, max_length=150)
 	raw_sms_text: Optional[str] = Field(default=None, description="Оригинальный текст СМС")
 	
-	is_halal_suspect: bool = Field(default=False, description="Флаг подозрительной транзакции (Халяль)")
 	
 	created_at: datetime = Field(
 		default_factory=lambda: datetime.now(UTC),  # Для Pydantic (Python-код)
@@ -173,19 +172,19 @@ class Transaction(SQLModel, table=True):
 	)
 	
 	def __str__(self):
-		desc = self.merchant_name or self.type.value
+		desc = self.description or self.type.value
 		return f"{self.amount} - {desc}"
 	
 	async def __admin_repr__(self, request: Request):
 		# Если есть имя мерчанта - показываем его, иначе тип транзакции
-		desc = self.merchant_name if self.merchant_name else self.type.value.capitalize()
+		desc = self.description if self.description else self.type.value.capitalize()
 		return f"{self.amount} ({desc})"
 	
 	async def __admin_select2_repr__(self, request: Request):
 		# Красим сумму: Зеленый для доходов, Красный для расходов
 		color_class = "text-success" if self.type == TransactionType.INCOME else "text-danger"
 		
-		desc = self.merchant_name if self.merchant_name else self.type.value.capitalize()
+		desc = self.description if self.description else self.type.value.capitalize()
 		date_str = self.created_at.strftime("%Y-%m-%d %H:%M")
 		
 		return (
