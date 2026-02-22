@@ -1,15 +1,12 @@
-
 from starlette.middleware import Middleware
 from starlette.middleware.sessions import SessionMiddleware
 
 from starlette_admin.contrib.sqla import Admin as StarletteAdmin
-
 from starlette_admin.i18n import I18nConfig
 
 from app.core.admin_auth import MonetaAuthProvider
 from app.core.config import settings
 from app.core.database import engine
-
 
 from app.modules.auth.models import User
 from app.modules.finance.models import Currency, CurrencyRate, Category, Wallet, Transaction
@@ -22,7 +19,6 @@ from app.modules.finance.admin import (
     WalletAdmin,
     TransactionAdmin
 )
-
 
 
 def create_admin():

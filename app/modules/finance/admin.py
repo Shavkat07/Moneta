@@ -9,7 +9,6 @@ from starlette_admin.fields import (
 	EnumField,
 	HasOne,
 	HasMany,
-	BooleanField,
 	TextAreaField
 )
 from app.modules.finance.models import WalletType, TransactionType, CategoryType
@@ -37,6 +36,7 @@ class CurrencyRateAdmin(ModelView):
 
 
 class CategoryAdmin(ModelView):
+	identity = "category"
 	fields = [
 		StringField("id", label="ID", exclude_from_create=True, exclude_from_edit=True),
 		StringField("name", label="Name"),
@@ -47,9 +47,11 @@ class CategoryAdmin(ModelView):
 		HasMany("children", label="Subcategories", identity="category"),
 	]
 	searchable_fields = ["name"]
+	sortable_fields = ['user']
 
 
 class WalletAdmin(ModelView):
+	identity = "wallet"
 	fields = [
 		StringField("id", label="ID", exclude_from_create=True, exclude_from_edit=True),
 		HasOne("user", label="Owner", identity="user"),
@@ -64,23 +66,34 @@ class WalletAdmin(ModelView):
 
 class TransactionAdmin(ModelView):
 	fields = [
-		StringField("id", label="ID", exclude_from_create=True, exclude_from_edit=True),
-		
-		DateTimeField("created_at", label="Created At"),
-		
-		EnumField("type", label="Type", enum=TransactionType),
-		DecimalField("amount", label="Amount"),
-		
-		HasOne("wallet", label="Wallet", identity="wallet"),
-		HasOne("category", label="Category", identity="category"),
-		
-		StringField("description", label="Merchant"),
-		TextAreaField("raw_sms_text", label="SMS Raw Text"),
+		StringField("id", label="ID", read_only=True),
+		DateTimeField("created_at", label="Created At", read_only=True),
+		DecimalField("amount", label="Amount", read_only=True),
+		EnumField("type", label="Type", enum=TransactionType, read_only=True),
+		HasOne("wallet", label="Wallet", identity="wallet", read_only=True),
+		HasOne("target_wallet", label="Target Wallet", identity="wallet", read_only=True),
+		HasOne("category", label="Category", identity="category", read_only=True),
+		StringField("description", label="Description", read_only=True),
+		TextAreaField("raw_sms_text", label="SMS Raw Text", read_only=True),
+
 	]
 	
 	# Мощный фильтр для поиска
 	searchable_fields = ["wallet.name", "amount"]
 	sortable_fields = ["created_at", "amount"]
 	
-	exclude_fields_from_create = ["created_at"]
+	async def can_create(self, request) -> bool:
+		return False
+	
+	async def can_edit(self, request) -> bool:
+		return False
+	
+	async def can_delete(self, request) -> bool:
+		return False
+	
+	# ---------- Разрешаем только просмотр ----------
+	async def can_view_details(self, request) -> bool:
+		return True
 
+	
+	

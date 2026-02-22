@@ -1,5 +1,5 @@
 from typing import List, Optional
-from fastapi import APIRouter, Depends, Query, status
+from fastapi import APIRouter, Depends, Query, status, HTTPException
 from sqlmodel import Session, select, desc
 
 from app.core.database import get_session
@@ -14,12 +14,25 @@ router = APIRouter()
 
 @router.post("", response_model=TransactionRead, status_code=status.HTTP_201_CREATED, summary="Добавить операцию")
 def create_transaction(
-		transaction_in: TransactionCreate,
-		session: Session = Depends(get_session),
-		current_user: User = Depends(get_current_user)
+    transaction_in: TransactionCreate,
+    session: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user),
 ):
-	service = TransactionService(session)
-	return service.create_transaction(transaction_in, current_user.id)
+    service = TransactionService(session)
+
+    try:
+        tx = service.create_transaction(transaction_in, current_user.id)
+        session.commit()
+        session.refresh(tx)
+        return tx
+
+    except HTTPException:
+        session.rollback()
+        raise
+
+    except Exception as e:
+        session.rollback()
+        raise HTTPException(status_code=500, detail="Внутренняя ошибка сервера")
 
 
 @router.get("/all", response_model=List[TransactionRead], summary="История операций")
@@ -36,7 +49,7 @@ def get_transactions(
 	if wallet_id:
 		query = query.where(Transaction.wallet_id == wallet_id)
 	
-	query = query.order_by(desc(Transaction.date), desc(Transaction.created_at))
+	query = query.order_by(desc(Transaction.created_at))
 	query = query.offset(skip).limit(limit)
 	
 	return session.exec(query).all()

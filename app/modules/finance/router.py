@@ -12,8 +12,8 @@ router = APIRouter()
 # 1. Подключаем Валюты
 router.include_router(
     currencies.router,
-    prefix="/currency",     # Итоговый путь: /api/v1/finance/currency/...
-    tags=["Currencies"]     # <--- ВОТ ЧТО ДЕЛИТ ИХ В SWAGGER
+    prefix="/currency",
+    tags=["Currencies"]
 )
 
 # 2. Подключаем Категории

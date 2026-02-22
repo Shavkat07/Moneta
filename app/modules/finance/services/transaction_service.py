@@ -21,106 +21,122 @@ class TransactionService:
 	# =========================================================================
 	
 	def create_transaction(self, transaction_in: TransactionCreate, user_id: UUID) -> Transaction:
-		"""
-		Создает транзакцию с учетом блокировок и проверки баланса.
-		"""
+		
 		amount = Decimal(str(transaction_in.amount))
 		if amount <= 0:
 			raise HTTPException(status_code=400, detail="Сумма должна быть больше нуля")
 		
-		# Атомарная транзакция БД
-		try:
-			with self.session.begin_nested():
-				# 1. Определяем, какие кошельки блокировать
-				wallet_ids = {transaction_in.wallet_id}
-				if transaction_in.type == TransactionType.TRANSFER:
-					if not transaction_in.target_wallet_id:
-						raise HTTPException(status_code=400, detail="Не указан целевой кошелек для перевода")
-					if transaction_in.wallet_id == transaction_in.target_wallet_id:
-						raise HTTPException(status_code=400, detail="Нельзя перевести на тот же кошелек")
-					wallet_ids.add(transaction_in.target_wallet_id)
-				
-				# 2. Блокируем кошельки (SELECT FOR UPDATE)
-				wallets = self._get_wallets_locked(list(wallet_ids), user_id)
-				source_wallet = wallets[transaction_in.wallet_id]
-				
-				main_transaction = None
-				
-				# 3. Логика по типам
-				if transaction_in.type == TransactionType.INCOME:
-					self._modify_balance(source_wallet, amount, is_adding=True)
-					main_transaction = self._build_transaction_model(
-						wallet_id=source_wallet.id,
-						amount=amount,
-						tx_type=TransactionType.INCOME,
-						data=transaction_in
-					)
-				
-				elif transaction_in.type == TransactionType.EXPENSE:
-					self._modify_balance(source_wallet, amount, is_adding=False)
-					main_transaction = self._build_transaction_model(
-						wallet_id=source_wallet.id,
-						amount=amount,
-						tx_type=TransactionType.EXPENSE,
-						data=transaction_in
-					)
-				
-				elif transaction_in.type == TransactionType.TRANSFER:
-					target_wallet = wallets[transaction_in.target_wallet_id]
-					
-					# Списание с источника
-					self._modify_balance(source_wallet, amount, is_adding=False)
-					
-					# Конвертация
-					converted_amount = self.currency_service.convert(
-						amount=amount,
-						from_currency_id=source_wallet.currency_id,
-						to_currency_id=target_wallet.currency_id
-					)
-					
-					# Зачисление на цель
-					self._modify_balance(target_wallet, converted_amount, is_adding=True)
-					
-					# Запись расхода (Source)
-					expense_tx = self._build_transaction_model(
-						wallet_id=source_wallet.id,
-						amount=amount,
-						tx_type=TransactionType.EXPENSE,
-						data=transaction_in,
-						description=f"Перевод на {target_wallet.name}"
-					)
-					self.session.add(expense_tx)
-					self.session.flush()
-					
-					# Запись дохода (Target)
-					income_tx = self._build_transaction_model(
-						wallet_id=target_wallet.id,
-						amount=converted_amount,
-						tx_type=TransactionType.INCOME,
-						data=transaction_in,  # Копируем категорию/дату
-						description=f"Перевод от {source_wallet.name}",
-						related_id=expense_tx.id
-					)
-					# Очищаем категорию для входящего перевода, чтобы не дублировать статистику
-					income_tx.category_id = None
-					self.session.add(income_tx)
-					self.session.flush()
-					
-					# Связываем
-					expense_tx.related_transaction_id = income_tx.id
-					main_transaction = expense_tx
-				
-				self.session.add(main_transaction)
-				self.session.commit()
-				self.session.refresh(main_transaction)
-				return main_transaction
+		# ----------------------------
+		# Определяем кошельки
+		# ----------------------------
+		wallet_ids = [transaction_in.wallet_id]
 		
-		except HTTPException:
-			raise
-		except Exception as e:
-			self.session.rollback()
-			# В продакшене здесь нужен logger.error(e)
-			raise HTTPException(status_code=500, detail=f"Ошибка обработки транзакции: {str(e)}")
+		if transaction_in.type == TransactionType.TRANSFER:
+			if not transaction_in.target_wallet_id:
+				raise HTTPException(status_code=400, detail="Не указан целевой кошелек")
+			if transaction_in.wallet_id == transaction_in.target_wallet_id:
+				raise HTTPException(status_code=400, detail="Нельзя переводить на тот же кошелек")
+			
+			wallet_ids.append(transaction_in.target_wallet_id)
+		
+		# ----------------------------
+		# Блокируем кошельки
+		# ----------------------------
+		wallets = self._get_wallets_locked(wallet_ids, user_id)
+		
+		source_wallet = wallets.get(transaction_in.wallet_id)
+		if not source_wallet:
+			raise HTTPException(status_code=404, detail="Кошелек не найден")
+		
+		# ==========================================================
+		# INCOME
+		# ==========================================================
+		if transaction_in.type == TransactionType.INCOME:
+			source_wallet.balance += amount
+			
+			tx = self._build_transaction_model(
+				wallet_id=source_wallet.id,
+				amount=amount,
+				tx_type=TransactionType.INCOME,
+				data=transaction_in
+			)
+			
+			self.session.add(tx)
+			self.session.flush()
+			return tx
+		
+		# ==========================================================
+		# EXPENSE
+		# ==========================================================
+		if transaction_in.type == TransactionType.EXPENSE:
+			
+			if source_wallet.balance < amount:
+				raise HTTPException(status_code=400, detail="Недостаточно средств")
+			
+			source_wallet.balance -= amount
+			
+			tx = self._build_transaction_model(
+				wallet_id=source_wallet.id,
+				amount=amount,
+				tx_type=TransactionType.EXPENSE,
+				data=transaction_in
+			)
+			
+			self.session.add(tx)
+			self.session.flush()
+			return tx
+		
+		# ==========================================================
+		# TRANSFER
+		# ==========================================================
+		target_wallet = wallets.get(transaction_in.target_wallet_id)
+		if not target_wallet:
+			raise HTTPException(status_code=404, detail="Целевой кошелек не найден")
+		
+		if source_wallet.balance < amount:
+			raise HTTPException(status_code=400, detail="Недостаточно средств")
+		
+		# списание
+		source_wallet.balance -= amount
+		
+		# конвертация
+		converted_amount = self.currency_service.convert(
+			amount=amount,
+			from_currency_id=source_wallet.currency_id,
+			to_currency_id=target_wallet.currency_id
+		)
+		
+		# зачисление
+		target_wallet.balance += converted_amount
+		
+		# расход
+		expense_tx = self._build_transaction_model(
+			wallet_id=source_wallet.id,
+			amount=amount,
+			tx_type=TransactionType.EXPENSE,
+			data=transaction_in,
+			description=f"Перевод на {target_wallet.name}"
+		)
+		self.session.add(expense_tx)
+		self.session.flush()
+		
+		# доход
+		income_tx = self._build_transaction_model(
+			wallet_id=target_wallet.id,
+			amount=converted_amount,
+			tx_type=TransactionType.INCOME,
+			data=transaction_in,
+			description=f"Перевод от {source_wallet.name}",
+			related_id=expense_tx.id
+		)
+		income_tx.category_id = None
+		
+		self.session.add(income_tx)
+		self.session.flush()
+		
+		expense_tx.related_transaction_id = income_tx.id
+		
+		return expense_tx
 	
 	def update_transaction(self, transaction_id: int, update_data: TransactionUpdate, user_id: UUID) -> Transaction:
 		"""
@@ -241,24 +257,25 @@ class TransactionService:
 	# =========================================================================
 	
 	def _get_wallets_locked(self, wallet_ids: List[int], user_id: UUID) -> Dict[int, Wallet]:
-		"""
-		Загружает кошельки с блокировкой FOR UPDATE.
-		Сортирует ID для предотвращения Deadlock.
-		Проверяет владельца.
-		"""
-		sorted_ids = sorted(list(set(wallet_ids)))  # Убираем дубли и сортируем
-		stmt = select(Wallet).where(col(Wallet.id).in_(sorted_ids)).with_for_update()
+		
+		if not wallet_ids:
+			raise HTTPException(status_code=400, detail="Список кошельков пуст")
+		
+		sorted_ids = sorted(set(wallet_ids))
+		
+		stmt = (
+			select(Wallet)
+			.where(Wallet.id.in_(sorted_ids))
+			.where(Wallet.user_id == user_id)
+			.with_for_update()
+		)
+		
 		results = self.session.exec(stmt).all()
 		
-		wallets_map = {w.id: w for w in results}
+		if len(results) != len(sorted_ids):
+			raise HTTPException(status_code=404, detail="Один из кошельков не найден")
 		
-		for wid in sorted_ids:
-			if wid not in wallets_map:
-				raise HTTPException(status_code=404, detail=f"Кошелек {wid} не найден")
-			if wallets_map[wid].user_id != user_id:
-				raise HTTPException(status_code=403, detail=f"Нет доступа к кошельку {wid}")
-		
-		return wallets_map
+		return {w.id: w for w in results}
 	
 	def _modify_balance(self, wallet: Wallet, amount: Decimal, is_adding: bool):
 		"""
